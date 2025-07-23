@@ -570,6 +570,90 @@ body {
   color: var(--subtle-text-color);
 }
 
+/* Login Modal */
+.login-modal-overlay {
+  backdrop-filter: blur(3px);
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.login-modal-content {
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.login-header h2 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-color);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.login-header p {
+  margin: 0 0 2rem 0;
+  color: var(--subtle-text-color);
+  font-size: 0.95rem;
+}
+
+.login-form {
+  text-align: left;
+}
+
+.login-form .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.login-form .form-control.error {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 0.875rem;
+  font-size: 1rem;
+  font-weight: 500;
+  background: linear-gradient(135deg, var(--color-deciding), var(--color-effecting));
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 1.5rem;
+}
+
+.login-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+.login-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.login-footer {
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+}
+
+.login-footer p {
+  margin: 0;
+  color: var(--subtle-text-color);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
 /* Delete Confirmation Modal */
 .delete-confirmation-modal {
   text-align: center;

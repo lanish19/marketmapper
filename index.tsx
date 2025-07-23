@@ -7,6 +7,20 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as XLSX from 'xlsx';
 
+// Authentication system
+const PASSWORD_HASH = (import.meta as any).env?.VITE_PASSWORD_HASH || '4d984e28'; // Hash of "squadradc"
+
+// Simple hash function for password verification
+const simpleHash = (str: string): string => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(16);
+};
+
 // Color system for dynamic category colors
 const COLOR_PALETTE = [
     { main: '#007BFF', bg: '#e6f2ff' }, // Blue (Effecting)
@@ -324,6 +338,77 @@ const Modal: React.FC<ModalProps> = ({ children, onClose }) => {
             <div className="modal-content" onClick={e => e.stopPropagation()}>
                 <button className="modal-close" onClick={onClose} aria-label="Close modal">&times;</button>
                 {children}
+            </div>
+        </div>
+    );
+};
+
+// Login Modal Component
+interface LoginModalProps {
+    onAuthenticate: () => void;
+}
+
+const LoginModal: React.FC<LoginModalProps> = ({ onAuthenticate }) => {
+    const [password, setPassword] = React.useState('');
+    const [error, setError] = React.useState('');
+    const [isLoading, setIsLoading] = React.useState(false);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError('');
+
+        // Hash the entered password and compare
+        const enteredHash = simpleHash(password);
+        
+        if (enteredHash === PASSWORD_HASH) {
+            // Store authentication in sessionStorage (cleared when browser closed)
+            sessionStorage.setItem('market-map-auth', 'true');
+            onAuthenticate();
+        } else {
+            setError('Incorrect password. Please try again.');
+            setPassword('');
+        }
+        
+        setIsLoading(false);
+    };
+
+    return (
+        <div className="modal-overlay login-modal-overlay" role="dialog" aria-modal="true">
+            <div className="modal-content login-modal-content">
+                <div className="login-header">
+                    <h2>Market Map Access</h2>
+                    <p>Please enter the password to continue</p>
+                </div>
+                
+                <form onSubmit={handleSubmit} className="login-form">
+                    <div className="form-group">
+                        <label htmlFor="password">Password</label>
+                        <input
+                            id="password"
+                            type="password"
+                            className={`form-control ${error ? 'error' : ''}`}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter password"
+                            autoFocus
+                            disabled={isLoading}
+                        />
+                        {error && <div className="error-message">{error}</div>}
+                    </div>
+                    
+                    <button 
+                        type="submit" 
+                        className="btn btn-primary login-btn"
+                        disabled={!password.trim() || isLoading}
+                    >
+                        {isLoading ? 'Verifying...' : 'Access Market Map'}
+                    </button>
+                </form>
+                
+                <div className="login-footer">
+                    <p>Authorized personnel only</p>
+                </div>
             </div>
         </div>
     );
@@ -1279,6 +1364,10 @@ const MatrixView: React.FC<MatrixViewProps> = React.memo(({ categories, firms, o
 });
 
 const App = () => {
+    // Authentication state
+    const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+    const [authLoading, setAuthLoading] = React.useState(true);
+    
     // State management with loading and error states
     const [marketMaps, setMarketMaps] = React.useState<MarketMaps>({});
     const [activeMapId, setActiveMapId] = React.useState<string>('');
@@ -1291,8 +1380,25 @@ const App = () => {
 
     const activeMap = marketMaps[activeMapId];
 
-    // Load initial data from API
+    // Check authentication status on app load
     React.useEffect(() => {
+        const checkAuth = () => {
+            const isAuthed = sessionStorage.getItem('market-map-auth') === 'true';
+            setIsAuthenticated(isAuthed);
+            setAuthLoading(false);
+        };
+        
+        checkAuth();
+    }, []);
+
+    const handleAuthentication = () => {
+        setIsAuthenticated(true);
+    };
+
+    // Load initial data from API (only when authenticated)
+    React.useEffect(() => {
+        if (!isAuthenticated) return;
+        
         const loadInitialData = async () => {
             try {
                 setLoading(true);
@@ -1317,7 +1423,7 @@ const App = () => {
         };
 
         loadInitialData();
-    }, []);
+    }, [isAuthenticated]);
 
     // Save data to API whenever marketMaps changes
     const saveData = React.useCallback(async (data: MarketMaps) => {
@@ -1343,14 +1449,16 @@ const App = () => {
         return () => clearTimeout(timeoutId);
     }, [marketMaps, saveData]);
 
-    // Real-time sync subscription
+    // Real-time sync subscription (only when authenticated)
     React.useEffect(() => {
+        if (!isAuthenticated) return;
+        
         const unsubscribe = subscribeToUpdates((newData) => {
             setMarketMaps(newData);
         });
 
         return unsubscribe;
-    }, []);
+    }, [isAuthenticated]);
 
     const closeModal = React.useCallback(() => setModal({ isOpen: false, type: null, data: null }), []);
 
@@ -1646,6 +1754,20 @@ const App = () => {
         closeModal();
         alert(`Successfully imported ${selectedFirms.length} firm${selectedFirms.length !== 1 ? 's' : ''}!`);
     };
+
+    // Authentication check
+    if (authLoading) {
+        return (
+            <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p>Checking access...</p>
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return <LoginModal onAuthenticate={handleAuthentication} />;
+    }
 
     // Loading state
     if (loading) {

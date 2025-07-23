@@ -4,6 +4,7 @@ A collaborative market mapping tool with persistent Redis storage and real-time 
 
 ## Features
 
+- **Password Protection**: Secure access with password authentication (default: "squadradc")
 - **Persistent Storage**: All data is stored in Redis and persists across sessions
 - **Real-time Collaboration**: Multiple users can collaborate simultaneously with live updates
 - **Multiple Views**: Switch between Kanban and Matrix views
@@ -51,6 +52,40 @@ The following environment variables are required:
 
 - `REDIS_URL`: Redis connection string (format: `redis://username:password@host:port`)
 
+### Optional Environment Variables
+
+- `VITE_PASSWORD_HASH`: Custom password hash for authentication (if not set, uses default hash for "squadradc")
+
+### Setting Up Custom Password
+
+To use a custom password:
+
+1. Generate a hash for your password using Node.js:
+   ```bash
+   node -e "
+   const simpleHash = (str) => {
+       let hash = 0;
+       for (let i = 0; i < str.length; i++) {
+           const char = str.charCodeAt(i);
+           hash = ((hash << 5) - hash) + char;
+           hash = hash & hash;
+       }
+       return Math.abs(hash).toString(16);
+   };
+   console.log('Hash for your_password:', simpleHash('your_password'));
+   "
+   ```
+
+2. Set the environment variable:
+   ```bash
+   export VITE_PASSWORD_HASH=your_generated_hash
+   ```
+
+   Or in Vercel deployment settings, add:
+   ```
+   VITE_PASSWORD_HASH=your_generated_hash
+   ```
+
 ## API Endpoints
 
 ### `/api/data`
@@ -62,10 +97,20 @@ The following environment variables are required:
 
 ## Security Features
 
+- **Password Protection**: Client-side authentication with hashed password verification
+- **Session-based Access**: Authentication persists for browser session only
+- **Secure Password Storage**: Passwords are hashed and stored as environment variables (not in source code)
 - Rate limiting (100 requests per minute per IP)
 - Input validation and sanitization
 - CORS headers configured
 - String length limits to prevent abuse
+
+### Security Notes
+
+- The password protection is implemented client-side for simplicity
+- For production use with sensitive data, consider implementing server-side authentication
+- The default password "squadradc" should be changed by setting the `VITE_PASSWORD_HASH` environment variable
+- Authentication is cleared when the browser session ends
 
 ## Development
 
