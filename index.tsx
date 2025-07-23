@@ -7,8 +7,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as XLSX from 'xlsx';
 
-// Authentication system
-const PASSWORD_HASH = (import.meta as any).env?.VITE_PASSWORD_HASH || '4d984e28'; // Hash of "squadradc"
+// Authentication system - password hash stored in environment variables
+const PASSWORD_HASH = (import.meta as any).env?.VITE_PASSWORD_HASH || '10ab1d49';
 
 // Simple hash function for password verification
 const simpleHash = (str: string): string => {

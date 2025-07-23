@@ -4,7 +4,7 @@ A collaborative market mapping tool with persistent Redis storage and real-time 
 
 ## Features
 
-- **Password Protection**: Secure access with password authentication (default: "squadradc")
+- **Password Protection**: Secure access with password authentication
 - **Persistent Storage**: All data is stored in Redis and persists across sessions
 - **Real-time Collaboration**: Multiple users can collaborate simultaneously with live updates
 - **Multiple Views**: Switch between Kanban and Matrix views
@@ -54,7 +54,7 @@ The following environment variables are required:
 
 ### Optional Environment Variables
 
-- `VITE_PASSWORD_HASH`: Custom password hash for authentication (if not set, uses default hash for "squadradc")
+- `VITE_PASSWORD_HASH`: Custom password hash for authentication (required for security)
 
 ### Setting Up Custom Password
 
@@ -109,7 +109,7 @@ To use a custom password:
 
 - The password protection is implemented client-side for simplicity
 - For production use with sensitive data, consider implementing server-side authentication
-- The default password "squadradc" should be changed by setting the `VITE_PASSWORD_HASH` environment variable
+- Always set a custom password using the `VITE_PASSWORD_HASH` environment variable
 - Authentication is cleared when the browser session ends
 
 ## Development
