@@ -1,159 +1,186 @@
 # Market Map Creator
 
-An interactive market map application to categorize and visualize firms and products with persistent data storage.
+A collaborative market mapping tool with persistent Redis storage and real-time synchronization.
 
 ## Features
 
-- **Interactive Kanban View**: Organize firms into customizable categories
-- **Matrix View**: Cross-reference firms by category and subcategory  
-- **Data Persistence**: Automatically saves work to browser localStorage
-- **Export/Import**: Share data between colleagues via JSON files
-- **Real-time Updates**: All changes are automatically saved
-- **Multiple Market Maps**: Create and manage different market maps
+- **Persistent Storage**: All data is stored in Redis and persists across sessions
+- **Real-time Collaboration**: Multiple users can collaborate simultaneously with live updates
+- **Multiple Views**: Switch between Kanban and Matrix views
+- **Market Map Management**: Create, edit, and delete market maps with confirmation dialogs
+- **Export/Import**: Export and import market map data as JSON or Excel files
+- **Responsive Design**: Works on desktop and mobile devices
 
-## Getting Started
+## Architecture
 
-### For Colleagues (Using the Deployed App)
+### Frontend
+- React 19 with TypeScript
+- Vite for development and building
+- CSS with custom properties for theming
 
-1. Visit the deployed app URL (provided after deployment)
-2. Start creating market maps and adding firms
-3. Your work is automatically saved in your browser
-4. Use Export/Import to share data with teammates
+### Backend
+- Vercel serverless functions
+- Redis for persistent storage and pub/sub
+- Server-Sent Events for real-time updates
 
-### For Developers
-
-#### Prerequisites
-- Node.js (v16 or higher)
-- npm
-
-#### Installation
-```bash
-git clone <repository-url>
-cd market-map-creator
-npm install
+### Storage Schema
+```javascript
+{
+  "market_maps": {
+    "map_id": {
+      "id": "string",
+      "name": "string", 
+      "categories": ["string"],
+      "firms": [
+        {
+          "id": "string",
+          "name": "string",
+          "category": "string",
+          "subcategory": "string",
+          "product": "string?" // optional
+        }
+      ]
+    }
+  }
+}
 ```
 
-#### Development
-```bash
-npm run dev
-```
-Open http://localhost:5173 in your browser.
+## Environment Variables
 
-#### Build for Production
+The following environment variables are required:
+
+- `REDIS_URL`: Redis connection string (format: `redis://username:password@host:port`)
+
+## API Endpoints
+
+### `/api/data`
+- **GET**: Retrieve all market maps
+- **POST/PUT**: Save market maps data
+
+### `/api/sync`
+- **GET**: Server-Sent Events endpoint for real-time updates
+
+## Security Features
+
+- Rate limiting (100 requests per minute per IP)
+- Input validation and sanitization
+- CORS headers configured
+- String length limits to prevent abuse
+
+## Development
+
+### Prerequisites
+- Node.js 18+
+- Redis instance (local or hosted)
+
+### Setup
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Set environment variables:
+   ```bash
+   export REDIS_URL="redis://username:password@host:port"
+   ```
+4. Start development server:
+   ```bash
+   npm run dev
+   ```
+
+### Building
 ```bash
 npm run build
 ```
 
-## Deployment Options
+## Deployment
 
-### Option 1: Vercel (Recommended - Easiest)
+### Vercel Deployment
+1. Connect your repository to Vercel
+2. Set the `REDIS_URL` environment variable in Vercel dashboard
+3. Deploy
 
-1. **Fork/Clone to GitHub**:
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/yourusername/market-map-creator.git
-   git push -u origin main
-   ```
+The app is configured with `vercel.json` for optimal serverless function settings.
 
-2. **Deploy to Vercel**:
-   - Go to [vercel.com](https://vercel.com)
-   - Sign up/login with GitHub
-   - Click "New Project"
-   - Import your GitHub repository
-   - Vercel will auto-detect it's a Vite app
-   - Click "Deploy"
-   - Your app will be live in ~2 minutes!
+### Redis Setup
+This app works with any Redis-compatible service:
+- Redis Cloud
+- AWS ElastiCache
+- Google Cloud Memorystore
+- Self-hosted Redis
 
-3. **Share with Colleagues**:
-   - Copy the Vercel URL (e.g., `https://market-map-creator.vercel.app`)
-   - Share this URL with your team
+## Usage
 
-### Option 2: Netlify
+### Creating Market Maps
+1. Click "Add Map" to create a new market map
+2. Enter a name for your market map
+3. Add categories (buckets) using the "+ Add Bucket" button
+4. Add firms to categories using the "Add New Firm" form
 
-1. **Deploy via Drag & Drop**:
-   - Run `npm run build`
-   - Go to [netlify.com](https://netlify.com)
-   - Drag the `dist` folder to Netlify's deploy area
-   - Get your live URL instantly
+### Managing Market Maps
+- **Edit Map Name**: Click the ⋮ button on any map tab or right-click the tab, then select "Edit Name"
+- **Delete Map**: Click the ⋮ button on any map tab or right-click the tab, then select "Delete Map"
+  - You'll be prompted with a warning showing what will be deleted
+  - Final confirmation requires typing the exact map name
+  - This action cannot be undone
 
-2. **Deploy via GitHub** (for auto-updates):
-   - Push code to GitHub (same as Vercel step 1)
-   - Connect Netlify to your GitHub repo
-   - Set build command: `npm run build`
-   - Set publish directory: `dist`
-   - Deploy!
+### Real-time Collaboration
+- Changes made by any user are automatically synced to all other users
+- The sync indicator shows when data is being saved
+- Uses Server-Sent Events for live updates
 
-### Option 3: GitHub Pages
+### Data Persistence
+- All changes are automatically saved to Redis
+- Data persists across browser sessions and page refreshes
+- Multiple users see the same shared dataset
 
-1. **Enable GitHub Pages**:
-   ```bash
-   npm run build
-   # Push the dist folder contents to gh-pages branch
-   ```
+### Excel Import
+- **Supported Formats**: .xlsx and .xls files
+- **Template Structure**: 
+  - Column A: Firm Name (required)
+  - Column B: Description (optional)
+- **Import Process**:
+  1. Click "Import Data" and select an Excel file
+  2. Review the checklist of detected firms
+  3. Select/deselect firms to import
+  4. Edit each firm's details (Category, Subcategory, Product)
+  5. Complete the import with validation
 
-## Usage Guide
+## Testing Multi-user Functionality
 
-### Creating Your First Market Map
+To test the collaborative features:
 
-1. **Add Firms**: Use the form at the bottom to add companies
-2. **Organize Categories**: Create custom buckets for different market segments
-3. **Assign Subcategories**: Tag firms with specific subcategories
-4. **Switch Views**: Toggle between Kanban and Matrix views
-
-### Sharing Data with Colleagues
-
-#### Method 1: Export/Import Files
-1. Click "Export Data" to download a JSON file
-2. Share the file with colleagues via email/Slack
-3. Colleagues can use "Import Data" to load your market map
-
-#### Method 2: Shared URL (if using cloud storage)
-- All colleagues access the same deployed URL
-- Each person's data is saved locally in their browser
-- Use export/import to merge data as needed
-
-### Data Management
-
-- **Auto-Save**: All changes are automatically saved to your browser
-- **Multiple Maps**: Create different maps for different markets
-- **Backup**: Regularly export your data as backup files
-- **Recovery**: If you lose data, import from a previous export
-
-## Browser Compatibility
-
-- Chrome (recommended)
-- Firefox
-- Safari
-- Edge
+1. Open the app in multiple browser windows/tabs
+2. Make changes in one window (add/edit/delete firms)
+3. Observe real-time updates in other windows
+4. Refresh pages to verify persistence
 
 ## Troubleshooting
 
-### Data Not Saving
-- Ensure your browser allows localStorage
-- Check if you're in private/incognito mode (localStorage is limited)
-- Try clearing browser cache and refreshing
+### Common Issues
 
-### Import/Export Issues
-- Ensure JSON files are valid (not corrupted)
-- File must have been exported from this app
-- Try using a different browser
+**Data not persisting:**
+- Check Redis connection string
+- Verify Redis server is running
+- Check browser console for API errors
 
-### Deployment Issues
-- Ensure all dependencies are installed: `npm install`
-- Verify build works locally: `npm run build`
-- Check that your hosting platform supports single-page applications
+**Real-time sync not working:**
+- Check if Server-Sent Events are supported
+- Verify network connectivity
+- Falls back to polling if SSE fails
+
+**Rate limiting errors:**
+- Wait a minute before making more requests
+- Check if multiple users are sharing the same IP
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Commit changes: `git commit -am 'Add feature'`
-4. Push to branch: `git push origin feature-name`
-5. Submit a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
 ## License
 
-Apache-2.0 License - see LICENSE file for details.
+Apache-2.0 License

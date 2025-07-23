@@ -5,6 +5,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import * as XLSX from 'xlsx';
 
 // Type definitions
 interface Firm {
@@ -24,6 +25,24 @@ interface MarketMap {
 
 interface MarketMaps {
     [key: string]: MarketMap;
+}
+
+interface ImportedFirm {
+    id: string;
+    name: string;
+    description: string;
+    // Fields to be filled by user
+    category: string;
+    subcategory: string;
+    product: string;
+    // Import state
+    selected: boolean;
+    edited: boolean;
+}
+
+interface ExcelImportData {
+    firms: ImportedFirm[];
+    fileName: string;
 }
 
 const initialMarketMapData: MarketMaps = {
@@ -61,6 +80,155 @@ const initialMarketMapData: MarketMaps = {
     }
 };
 
+// API utilities for Redis persistence
+const API_BASE_URL = '/api';
+
+const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers,
+            },
+            ...options,
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('API request failed:', error);
+        throw error;
+    }
+};
+
+const loadFromApi = async (): Promise<MarketMaps> => {
+    try {
+        return await apiRequest('/data');
+    } catch (error) {
+        console.error('Failed to load data from API:', error);
+        return initialMarketMapData;
+    }
+};
+
+const saveToApi = async (data: MarketMaps): Promise<void> => {
+    try {
+        await apiRequest('/data', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    } catch (error) {
+        console.error('Failed to save data to API:', error);
+        throw error;
+    }
+};
+
+// Excel parsing utilities
+const parseExcelFile = async (file: File): Promise<ExcelImportData | null> => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Get the first worksheet
+                const worksheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[worksheetName];
+                
+                // Convert to JSON
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                // Parse the data - expecting columns: A=Name, B=Description
+                const firms: ImportedFirm[] = [];
+                
+                for (let i = 1; i < jsonData.length; i++) { // Skip header row
+                    const row = jsonData[i] as any[];
+                    const name = row[0]?.toString()?.trim();
+                    const description = row[1]?.toString()?.trim() || '';
+                    
+                    if (name) {
+                        firms.push({
+                            id: `import_${Date.now()}_${i}`,
+                            name,
+                            description,
+                            category: '',
+                            subcategory: '',
+                            product: '',
+                            selected: true,
+                            edited: false
+                        });
+                    }
+                }
+                
+                resolve({
+                    firms,
+                    fileName: file.name
+                });
+            } catch (error) {
+                console.error('Error parsing Excel file:', error);
+                resolve(null);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+};
+
+// Real-time sync using Server-Sent Events
+const subscribeToUpdates = (onUpdate: (data: MarketMaps) => void) => {
+    try {
+        const eventSource = new EventSource('/api/sync');
+        
+        eventSource.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                if (message.type === 'market_maps_updated') {
+                    onUpdate(message.data);
+                }
+            } catch (error) {
+                console.error('Error parsing SSE message:', error);
+            }
+        };
+        
+        eventSource.onerror = (error) => {
+            console.error('SSE connection error:', error);
+            // Fallback to polling if SSE fails
+            setTimeout(() => {
+                eventSource.close();
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const data = await loadFromApi();
+                        onUpdate(data);
+                    } catch (error) {
+                        console.error('Failed to poll for updates:', error);
+                    }
+                }, 30000);
+                
+                return () => clearInterval(pollInterval);
+            }, 5000);
+        };
+        
+        return () => {
+            eventSource.close();
+        };
+    } catch (error) {
+        console.error('Failed to establish SSE connection:', error);
+        // Fallback to polling
+        const pollInterval = setInterval(async () => {
+            try {
+                const data = await loadFromApi();
+                onUpdate(data);
+            } catch (error) {
+                console.error('Failed to poll for updates:', error);
+            }
+        }, 30000);
+
+        return () => clearInterval(pollInterval);
+    }
+};
+
 const EditIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>;
 const DeleteIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>;
 
@@ -85,6 +253,283 @@ const Modal: React.FC<ModalProps> = ({ children, onClose }) => {
                 {children}
             </div>
         </div>
+    );
+};
+
+interface DeleteConfirmationModalProps {
+    mapName: string;
+    firmCount: number;
+    categoryCount: number;
+    onConfirm: () => void;
+    onCancel: () => void;
+}
+
+const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ 
+    mapName, 
+    firmCount, 
+    categoryCount, 
+    onConfirm, 
+    onCancel 
+}) => {
+    const [confirmationText, setConfirmationText] = React.useState('');
+    const [step, setStep] = React.useState<'warning' | 'confirmation'>('warning');
+
+    const handleProceed = () => {
+        if (step === 'warning') {
+            setStep('confirmation');
+        } else if (confirmationText === mapName) {
+            onConfirm();
+        }
+    };
+
+    const isConfirmationValid = confirmationText === mapName;
+
+    return (
+        <Modal onClose={onCancel}>
+            <div className="delete-confirmation-modal">
+                {step === 'warning' ? (
+                    <>
+                        <div className="warning-icon">⚠️</div>
+                        <h3>Delete Market Map</h3>
+                        <p>Are you sure you want to delete <strong>"{mapName}"</strong>?</p>
+                        <div className="deletion-details">
+                            <p>This will permanently delete:</p>
+                            <ul>
+                                <li>{firmCount} firms</li>
+                                <li>{categoryCount} categories</li>
+                                <li>All associated data</li>
+                            </ul>
+                            <p className="warning-text">⚠️ This action cannot be undone.</p>
+                        </div>
+                        <div className="form-actions">
+                            <button type="button" className="btn btn-secondary" onClick={onCancel}>
+                                Cancel
+                            </button>
+                            <button type="button" className="btn btn-danger" onClick={handleProceed}>
+                                Continue
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="danger-icon">🚨</div>
+                        <h3>Final Confirmation</h3>
+                        <p>To confirm deletion, please type the exact map name:</p>
+                        <div className="confirmation-name">"{mapName}"</div>
+                        <div className="form-group">
+                            <input
+                                type="text"
+                                className="form-control"
+                                value={confirmationText}
+                                onChange={(e) => setConfirmationText(e.target.value)}
+                                placeholder="Type the map name here"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="form-actions">
+                            <button type="button" className="btn btn-secondary" onClick={() => setStep('warning')}>
+                                Back
+                            </button>
+                            <button 
+                                type="button" 
+                                className={`btn btn-danger ${!isConfirmationValid ? 'disabled' : ''}`}
+                                onClick={handleProceed}
+                                disabled={!isConfirmationValid}
+                            >
+                                Delete Forever
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+        </Modal>
+    );
+};
+
+interface ExcelImportModalProps {
+    importData: ExcelImportData;
+    categories: string[];
+    allFirms: Firm[];
+    onImport: (selectedFirms: ImportedFirm[]) => void;
+    onCancel: () => void;
+}
+
+const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ 
+    importData, 
+    categories, 
+    allFirms, 
+    onImport, 
+    onCancel 
+}) => {
+    const [firms, setFirms] = React.useState<ImportedFirm[]>(importData.firms);
+    const [editingFirm, setEditingFirm] = React.useState<string | null>(null);
+
+    const uniqueSubcategories = React.useMemo(() => {
+        const subcats = new Set(allFirms.map(f => f.subcategory));
+        return Array.from(subcats).sort();
+    }, [allFirms]);
+
+    const selectedCount = firms.filter(f => f.selected).length;
+
+    const handleToggleSelect = (firmId: string) => {
+        setFirms(prev => prev.map(firm => 
+            firm.id === firmId ? { ...firm, selected: !firm.selected } : firm
+        ));
+    };
+
+    const handleSelectAll = () => {
+        const allSelected = firms.every(f => f.selected);
+        setFirms(prev => prev.map(firm => ({ ...firm, selected: !allSelected })));
+    };
+
+    const handleEditFirm = (firmId: string, updates: Partial<ImportedFirm>) => {
+        setFirms(prev => prev.map(firm => 
+            firm.id === firmId ? { ...firm, ...updates, edited: true } : firm
+        ));
+    };
+
+    const handleImport = () => {
+        const selectedFirms = firms.filter(f => f.selected);
+        
+        // Validate that all selected firms have required fields
+        const incompleteFields = selectedFirms.filter(f => !f.name || !f.category || !f.subcategory);
+        if (incompleteFields.length > 0) {
+            alert(`Please complete all required fields (Name, Category, Subcategory) for all selected firms.`);
+            return;
+        }
+
+        onImport(selectedFirms);
+    };
+
+    return (
+        <Modal onClose={onCancel}>
+            <div className="excel-import-modal">
+                <h3>Import from Excel: {importData.fileName}</h3>
+                <p>Select firms to import and fill in the required information:</p>
+                
+                <div className="import-summary">
+                    <div className="summary-actions">
+                        <button 
+                            type="button" 
+                            className="btn btn-secondary btn-sm"
+                            onClick={handleSelectAll}
+                        >
+                            {firms.every(f => f.selected) ? 'Deselect All' : 'Select All'}
+                        </button>
+                        <span className="selected-count">
+                            {selectedCount} of {firms.length} selected
+                        </span>
+                    </div>
+                </div>
+
+                <div className="import-list">
+                    {firms.map(firm => (
+                        <div key={firm.id} className={`import-item ${firm.selected ? 'selected' : ''}`}>
+                            <div className="import-item-header">
+                                <label className="import-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={firm.selected}
+                                        onChange={() => handleToggleSelect(firm.id)}
+                                    />
+                                    <span className="firm-name">{firm.name}</span>
+                                </label>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    onClick={() => setEditingFirm(editingFirm === firm.id ? null : firm.id)}
+                                >
+                                    {editingFirm === firm.id ? 'Done' : 'Edit'}
+                                </button>
+                            </div>
+                            
+                            {firm.description && (
+                                <div className="firm-description">{firm.description}</div>
+                            )}
+
+                            {editingFirm === firm.id && (
+                                <div className="edit-form">
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label>Firm Name</label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                value={firm.name}
+                                                onChange={(e) => handleEditFirm(firm.id, { name: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Product (Optional)</label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                value={firm.product}
+                                                onChange={(e) => handleEditFirm(firm.id, { product: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label>Subcategory</label>
+                                            <select
+                                                className="form-control"
+                                                value={firm.subcategory}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    if (value === '_new_') {
+                                                        const newSubcategory = prompt('Enter new subcategory:');
+                                                        if (newSubcategory) {
+                                                            handleEditFirm(firm.id, { subcategory: newSubcategory });
+                                                        }
+                                                    } else {
+                                                        handleEditFirm(firm.id, { subcategory: value });
+                                                    }
+                                                }}
+                                            >
+                                                <option value="">Select or create new</option>
+                                                <option value="_new_">Type new subcategory</option>
+                                                {uniqueSubcategories.map(sc => (
+                                                    <option key={sc} value={sc}>{sc}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Category *</label>
+                                            <select
+                                                className="form-control"
+                                                value={firm.category}
+                                                onChange={(e) => handleEditFirm(firm.id, { category: e.target.value })}
+                                                required
+                                            >
+                                                <option value="">Select a category</option>
+                                                {categories.map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                <div className="form-actions">
+                    <button type="button" className="btn btn-secondary" onClick={onCancel}>
+                        Cancel
+                    </button>
+                    <button 
+                        type="button" 
+                        className="btn btn-primary"
+                        onClick={handleImport}
+                        disabled={selectedCount === 0}
+                    >
+                        Import {selectedCount} Firm{selectedCount !== 1 ? 's' : ''}
+                    </button>
+                </div>
+            </div>
+        </Modal>
     );
 };
 
@@ -340,22 +785,87 @@ interface PageTabsProps {
     activeMapId: string;
     onSelect: (id: string) => void;
     onAddMap: () => void;
+    onEditMap: (mapId: string) => void;
+    onDeleteMap: (mapId: string) => void;
 }
 
-const PageTabs: React.FC<PageTabsProps> = ({ maps, activeMapId, onSelect, onAddMap }) => (
-    <nav className="page-tabs">
-        {Object.values(maps).map(map => (
-            <button
-                key={map.id}
-                className={`tab-btn ${map.id === activeMapId ? 'active' : ''}`}
-                onClick={() => onSelect(map.id)}
-            >
-                {map.name}
-            </button>
-        ))}
-        <button className="tab-btn add-map-btn" onClick={onAddMap}>+ Add Map</button>
-    </nav>
-);
+const PageTabs: React.FC<PageTabsProps> = ({ maps, activeMapId, onSelect, onAddMap, onEditMap, onDeleteMap }) => {
+    const [showDropdown, setShowDropdown] = React.useState<string | null>(null);
+
+    const handleTabClick = (mapId: string, event: React.MouseEvent) => {
+        // Right click or ctrl+click to show dropdown
+        if (event.button === 2 || event.ctrlKey || event.metaKey) {
+            event.preventDefault();
+            setShowDropdown(showDropdown === mapId ? null : mapId);
+        } else {
+            onSelect(mapId);
+            setShowDropdown(null);
+        }
+    };
+
+    const handleContextMenu = (mapId: string, event: React.MouseEvent) => {
+        event.preventDefault();
+        setShowDropdown(showDropdown === mapId ? null : mapId);
+    };
+
+    React.useEffect(() => {
+        const handleClickOutside = () => setShowDropdown(null);
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, []);
+
+    return (
+        <nav className="page-tabs">
+            {Object.values(maps).map(map => (
+                <div key={map.id} className="tab-container">
+                    <button
+                        className={`tab-btn ${map.id === activeMapId ? 'active' : ''}`}
+                        onClick={(e) => handleTabClick(map.id, e)}
+                        onContextMenu={(e) => handleContextMenu(map.id, e)}
+                        title="Right-click for options"
+                    >
+                        {map.name}
+                        <button 
+                            className="tab-options-btn"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDropdown(showDropdown === map.id ? null : map.id);
+                            }}
+                            aria-label={`Options for ${map.name}`}
+                        >
+                            ⋮
+                        </button>
+                    </button>
+                    {showDropdown === map.id && (
+                        <div className="tab-dropdown">
+                            <button
+                                className="dropdown-item"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEditMap(map.id);
+                                    setShowDropdown(null);
+                                }}
+                            >
+                                <EditIcon /> Edit Name
+                            </button>
+                            <button
+                                className="dropdown-item delete"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteMap(map.id);
+                                    setShowDropdown(null);
+                                }}
+                            >
+                                <DeleteIcon /> Delete Map
+                            </button>
+                        </div>
+                    )}
+                </div>
+            ))}
+            <button className="tab-btn add-map-btn" onClick={onAddMap}>+ Add Map</button>
+        </nav>
+    );
+};
 
 
 interface AddMapPageProps {
@@ -455,7 +965,10 @@ const MatrixView: React.FC<MatrixViewProps> = React.memo(({ categories, firms })
                                     <div className="cell-content">
                                         {(matrixData[cat]?.[subcat] || []).map(firm => (
                                             <div key={firm.id} className={`matrix-pill ${firm.category}`}>
-                                                {firm.name}
+                                                <span className="firm-name">{firm.name}</span>
+                                                {firm.product && (
+                                                    <span className="product-name"> ({firm.product})</span>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -469,52 +982,79 @@ const MatrixView: React.FC<MatrixViewProps> = React.memo(({ categories, firms })
     );
 });
 
-
-// Data persistence utilities
-const STORAGE_KEY = 'market-map-creator-data';
-
-const saveToStorage = (data: MarketMaps) => {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (error) {
-        console.error('Failed to save data to localStorage:', error);
-    }
-};
-
-const loadFromStorage = (): MarketMaps | null => {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        return saved ? JSON.parse(saved) : null;
-    } catch (error) {
-        console.error('Failed to load data from localStorage:', error);
-        return null;
-    }
-};
-
 const App = () => {
-    // Load saved data or use initial data
-    const [marketMaps, setMarketMaps] = React.useState<MarketMaps>(() => {
-        const saved = loadFromStorage();
-        return saved || initialMarketMapData;
-    });
-    const [activeMapId, setActiveMapId] = React.useState<string>(() => {
-        const saved = loadFromStorage();
-        if (saved) {
-            const mapIds = Object.keys(saved);
-            return mapIds.length > 0 ? mapIds[0] : 'CUAS';
-        }
-        return 'CUAS';
-    });
-    const [modal, setModal] = React.useState<{ isOpen: boolean; type: 'edit-firm' | null; data: Firm | null }>({ isOpen: false, type: null, data: null });
+    // State management with loading and error states
+    const [marketMaps, setMarketMaps] = React.useState<MarketMaps>({});
+    const [activeMapId, setActiveMapId] = React.useState<string>('');
+    const [loading, setLoading] = React.useState(true);
+    const [error, setError] = React.useState<string | null>(null);
+    const [saving, setSaving] = React.useState(false);
+    const [modal, setModal] = React.useState<{ isOpen: boolean; type: 'edit-firm' | 'delete-map' | 'excel-import' | null; data: Firm | null; mapId?: string; importData?: ExcelImportData }>({ isOpen: false, type: null, data: null });
     const [view, setView] = React.useState<'map' | 'add-map'>('map');
     const [currentView, setCurrentView] = React.useState<'kanban' | 'matrix'>('kanban');
 
     const activeMap = marketMaps[activeMapId];
 
-    // Auto-save to localStorage whenever marketMaps changes
+    // Load initial data from API
     React.useEffect(() => {
-        saveToStorage(marketMaps);
-    }, [marketMaps]);
+        const loadInitialData = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                const data = await loadFromApi();
+                setMarketMaps(data);
+                
+                // Set active map to first available map
+                const mapIds = Object.keys(data);
+                if (mapIds.length > 0) {
+                    setActiveMapId(mapIds[0]);
+                }
+            } catch (err) {
+                setError('Failed to load data. Please try refreshing the page.');
+                console.error('Failed to load initial data:', err);
+                // Fallback to initial data
+                setMarketMaps(initialMarketMapData);
+                setActiveMapId('CUAS');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadInitialData();
+    }, []);
+
+    // Save data to API whenever marketMaps changes
+    const saveData = React.useCallback(async (data: MarketMaps) => {
+        try {
+            setSaving(true);
+            await saveToApi(data);
+        } catch (err) {
+            setError('Failed to save data. Your changes may not be persistent.');
+            console.error('Failed to save data:', err);
+        } finally {
+            setSaving(false);
+        }
+    }, []);
+
+    // Auto-save whenever marketMaps changes (with debouncing)
+    React.useEffect(() => {
+        if (Object.keys(marketMaps).length === 0) return; // Don't save empty state
+        
+        const timeoutId = setTimeout(() => {
+            saveData(marketMaps);
+        }, 1000); // Debounce saves by 1 second
+
+        return () => clearTimeout(timeoutId);
+    }, [marketMaps, saveData]);
+
+    // Real-time sync subscription
+    React.useEffect(() => {
+        const unsubscribe = subscribeToUpdates((newData) => {
+            setMarketMaps(newData);
+        });
+
+        return unsubscribe;
+    }, []);
 
     const closeModal = React.useCallback(() => setModal({ isOpen: false, type: null, data: null }), []);
 
@@ -567,6 +1107,87 @@ const App = () => {
         setView('map');
     };
 
+    const handleEditMap = (mapId: string) => {
+        const currentMap = marketMaps[mapId];
+        if (!currentMap) return;
+
+        const newName = window.prompt(`Enter new name for "${currentMap.name}":`, currentMap.name);
+        if (!newName || newName.trim() === currentMap.name) return;
+
+        const trimmedName = newName.trim();
+        if (!trimmedName) {
+            alert("Map name cannot be empty.");
+            return;
+        }
+
+        // Check if a map with this name already exists (case-insensitive)
+        const newMapId = trimmedName.replace(/\s+/g, '-').toLowerCase();
+        if (newMapId !== mapId && marketMaps[newMapId]) {
+            alert("A map with this name already exists.");
+            return;
+        }
+
+        setMarketMaps(prev => {
+            const updated = { ...prev };
+            
+            if (newMapId !== mapId) {
+                // If ID changes, we need to create new entry and delete old one
+                updated[newMapId] = { ...currentMap, id: newMapId, name: trimmedName };
+                delete updated[mapId];
+                
+                // Update active map ID if this was the active map
+                if (activeMapId === mapId) {
+                    setActiveMapId(newMapId);
+                }
+            } else {
+                // Just update the name
+                updated[mapId] = { ...currentMap, name: trimmedName };
+            }
+            
+            return updated;
+        });
+    };
+
+    const handleDeleteMap = (mapId: string) => {
+        setModal({ isOpen: true, type: 'delete-map', data: null, mapId });
+    };
+
+    const confirmDeleteMap = (mapId: string) => {
+        const currentMap = marketMaps[mapId];
+        if (!currentMap) return;
+
+        setMarketMaps(prev => {
+            const updated = { ...prev };
+            delete updated[mapId];
+
+            // If we deleted the active map, switch to another map
+            if (activeMapId === mapId) {
+                const remainingMapIds = Object.keys(updated);
+                if (remainingMapIds.length > 0) {
+                    setActiveMapId(remainingMapIds[0]);
+                } else {
+                    // No maps left, create a default one
+                    const defaultMap = {
+                        id: 'default',
+                        name: 'New Market Map',
+                        categories: ['Category 1'],
+                        firms: []
+                    };
+                    updated['default'] = defaultMap;
+                    setActiveMapId('default');
+                }
+            }
+
+            return updated;
+        });
+
+        closeModal();
+        // Show success message briefly
+        setError(null);
+        setTimeout(() => {
+            alert(`"${currentMap.name}" has been successfully deleted.`);
+        }, 100);
+    };
 
     const handleAddColumn = () => {
         const name = window.prompt("Enter new bucket name:");
@@ -610,44 +1231,128 @@ const App = () => {
     };
 
     const handleExportData = () => {
-        const dataStr = JSON.stringify(marketMaps, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        // Convert market maps to CSV format
+        const activeMapData = marketMaps[activeMapId];
+        if (!activeMapData) return;
+
+        // CSV headers
+        const headers = ['Firm Name', 'Category', 'Subcategory', 'Product', 'Description'];
+        
+        // Convert firms to CSV rows
+        const rows = activeMapData.firms.map(firm => [
+            firm.name,
+            firm.category,
+            firm.subcategory,
+            firm.product || '',
+            '' // Description field (empty for now, can be added if needed)
+        ]);
+
+        // Combine headers and rows
+        const csvContent = [headers, ...rows]
+            .map(row => row.map(field => `"${(field || '').replace(/"/g, '""')}"`).join(','))
+            .join('\n');
+
+        const dataBlob = new Blob([csvContent], { type: 'text/csv' });
         const url = URL.createObjectURL(dataBlob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'market-maps-export.json';
+        link.download = `${activeMapData.name}-export.csv`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
     };
 
-    const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
+        const fileName = file.name.toLowerCase();
+        
+        // Check if it's an Excel file
+        if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
             try {
-                const importedData = JSON.parse(e.target?.result as string);
-                if (typeof importedData === 'object' && importedData !== null) {
-                    setMarketMaps(importedData);
-                    const mapIds = Object.keys(importedData);
-                    if (mapIds.length > 0) {
-                        setActiveMapId(mapIds[0]);
-                    }
-                    alert('Data imported successfully!');
+                const importData = await parseExcelFile(file);
+                if (importData && importData.firms.length > 0) {
+                    setModal({ 
+                        isOpen: true, 
+                        type: 'excel-import', 
+                        data: null, 
+                        importData 
+                    });
                 } else {
-                    alert('Invalid file format. Please select a valid JSON file.');
+                    alert('No valid data found in Excel file. Please ensure the file has firm names in column A and descriptions in column B.');
                 }
             } catch (error) {
-                alert('Error reading file. Please ensure it\'s a valid JSON file.');
+                alert('Error reading Excel file. Please ensure it\'s a valid Excel file.');
             }
-        };
-        reader.readAsText(file);
+        } else {
+            // Handle JSON import (existing functionality)
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedData = JSON.parse(e.target?.result as string);
+                    if (typeof importedData === 'object' && importedData !== null) {
+                        setMarketMaps(importedData);
+                        const mapIds = Object.keys(importedData);
+                        if (mapIds.length > 0) {
+                            setActiveMapId(mapIds[0]);
+                        }
+                        alert('Data imported successfully!');
+                    } else {
+                        alert('Invalid file format. Please select a valid JSON file.');
+                    }
+                } catch (error) {
+                    alert('Error reading file. Please ensure it\'s a valid JSON file.');
+                }
+            };
+            reader.readAsText(file);
+        }
+        
         // Reset the input so the same file can be selected again
         event.target.value = '';
     };
+
+    const handleExcelImport = (selectedFirms: ImportedFirm[]) => {
+        // Convert imported firms to regular firms and add them to the current map
+        const newFirms: Firm[] = selectedFirms.map(importedFirm => ({
+            id: String(Date.now() + Math.random()),
+            name: importedFirm.name,
+            category: importedFirm.category,
+            subcategory: importedFirm.subcategory,
+            product: importedFirm.product || undefined
+        }));
+
+        setMarketMaps(prev => {
+            const map = prev[activeMapId];
+            const updatedFirms = [...map.firms, ...newFirms];
+            return { ...prev, [activeMapId]: { ...map, firms: updatedFirms }};
+        });
+
+        closeModal();
+        alert(`Successfully imported ${selectedFirms.length} firm${selectedFirms.length !== 1 ? 's' : ''}!`);
+    };
+
+    // Loading state
+    if (loading) {
+        return (
+            <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p>Loading market maps...</p>
+            </div>
+        );
+    }
+
+    // Error state
+    if (error) {
+        return (
+            <div className="error-container">
+                <h2>Error</h2>
+                <p>{error}</p>
+                <button onClick={() => window.location.reload()}>Retry</button>
+            </div>
+        );
+    }
 
     if (view === 'add-map') {
         return <AddMapPage onCreateMap={handleCreateMap} onCancel={() => setView('map')} />;
@@ -668,20 +1373,31 @@ const App = () => {
 
     return (
         <>
-            <PageTabs maps={marketMaps} activeMapId={activeMapId} onSelect={setActiveMapId} onAddMap={handleShowAddMapPage} />
+            <PageTabs 
+                maps={marketMaps} 
+                activeMapId={activeMapId} 
+                onSelect={setActiveMapId} 
+                onAddMap={handleShowAddMapPage}
+                onEditMap={handleEditMap}
+                onDeleteMap={handleDeleteMap}
+            />
             <div className="app-container">
                 <header className="header">
                     <h1>Market Map {'>'} <span>{activeMap.name}</span></h1>
                     <div className="header-actions">
+                        <div className="sync-status">
+                            {saving && <span className="sync-indicator saving">Saving...</span>}
+                            {!saving && <span className="sync-indicator synced">✓ Synced</span>}
+                        </div>
                         <div className="data-controls">
                             <button onClick={handleExportData} className="btn btn-secondary">
                                 Export Data
                             </button>
                             <label className="btn btn-secondary">
-                                Import Data
+                                Import Monday Dashboard Data (Excel)
                                 <input
                                     type="file"
-                                    accept=".json"
+                                    accept=".json,.xlsx,.xls"
                                     onChange={handleImportData}
                                     style={{ display: 'none' }}
                                 />
@@ -739,6 +1455,24 @@ const App = () => {
                         formTitle="Edit Firm"
                     />
                 </Modal>
+            )}
+            {modal.isOpen && modal.type === 'delete-map' && modal.mapId && marketMaps[modal.mapId] && (
+                <DeleteConfirmationModal
+                    mapName={marketMaps[modal.mapId].name}
+                    firmCount={marketMaps[modal.mapId].firms.length}
+                    categoryCount={marketMaps[modal.mapId].categories.length}
+                    onConfirm={() => confirmDeleteMap(modal.mapId!)}
+                    onCancel={closeModal}
+                />
+            )}
+            {modal.isOpen && modal.type === 'excel-import' && modal.importData && (
+                <ExcelImportModal
+                    importData={modal.importData}
+                    categories={activeMap.categories}
+                    allFirms={activeMap.firms}
+                    onImport={handleExcelImport}
+                    onCancel={closeModal}
+                />
             )}
         </>
     );

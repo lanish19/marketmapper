@@ -1,76 +1,190 @@
-# Quick Deployment Guide
+# Deployment Guide - Market Map Creator with Redis
 
-## 🚀 Deploy to Vercel (Recommended - 5 minutes)
+## Overview
+This guide covers deploying the Market Map Creator with Redis persistent storage to Vercel.
 
-### Step 1: Push to GitHub
-```bash
-# In your project folder
-git add .
-git commit -m "Market Map Creator - Ready for deployment"
-git branch -M main
+## Prerequisites
+- Vercel account
+- Redis instance (Redis Cloud recommended)
+- GitHub repository with your code
 
-# Create a new repository on GitHub, then:
-git remote add origin https://github.com/YOUR_USERNAME/market-map-creator.git
-git push -u origin main
+## Step 1: Redis Setup
+
+### Option A: Redis Cloud (Recommended)
+1. Go to [Redis Cloud](https://redis.com/try-free/)
+2. Sign up for a free account
+3. Create a new database
+4. Note down the connection string (format: `redis://username:password@host:port`)
+
+### Option B: Other Redis Providers
+- **AWS ElastiCache**: Follow AWS documentation to create a Redis cluster
+- **Google Cloud Memorystore**: Create a Redis instance in GCP
+- **Self-hosted**: Set up Redis on your own server
+
+## Step 2: Vercel Deployment
+
+### 2.1 Connect Repository
+1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
+2. Click "New Project"
+3. Import your GitHub repository
+4. Vercel will auto-detect it as a Vite project
+
+### 2.2 Configure Environment Variables
+1. In the Vercel project settings, go to "Environment Variables"
+2. Add the following variable:
+   - **Name**: `REDIS_URL`
+   - **Value**: Your Redis connection string
+   - **Environment**: Production, Preview, Development (select all)
+
+### 2.3 Deploy
+1. Click "Deploy"
+2. Wait for the build to complete (~2-3 minutes)
+3. Your app will be live at `https://your-project-name.vercel.app`
+
+## Step 3: Verification
+
+### 3.1 Test Basic Functionality
+1. Visit your deployed URL
+2. Create a new market map
+3. Add some firms
+4. Refresh the page to verify data persists
+
+### 3.2 Test Multi-user Collaboration
+1. Open the app in multiple browser windows/incognito tabs
+2. Make changes in one window
+3. Verify changes appear in other windows within ~30 seconds
+4. Test with different devices/networks if possible
+
+## Step 4: Domain Setup (Optional)
+
+### Custom Domain
+1. In Vercel project settings, go to "Domains"
+2. Add your custom domain
+3. Follow Vercel's DNS configuration instructions
+
+## Configuration Files Explained
+
+### `vercel.json`
+```json
+{
+  "functions": {
+    "api/data.js": { "maxDuration": 30 },
+    "api/sync.js": { "maxDuration": 300 }
+  },
+  "env": {
+    "REDIS_URL": "@redis_url"
+  }
+}
+```
+- Sets function timeouts for API endpoints
+- References environment variables
+
+### API Structure
+```
+/api/data.js    - CRUD operations for market maps
+/api/sync.js    - Server-Sent Events for real-time sync
 ```
 
-### Step 2: Deploy on Vercel
-1. Go to [vercel.com](https://vercel.com)
-2. Sign up with your GitHub account
-3. Click "New Project" 
-4. Select your `market-map-creator` repository
-5. Click "Deploy" (Vercel auto-detects Vite settings)
-6. Wait 2 minutes for deployment ✅
+## Monitoring and Maintenance
 
-### Step 3: Share with Team
-- Copy your Vercel URL (e.g., `https://market-map-creator-abc123.vercel.app`)
-- Share this URL with colleagues
-- Everyone can now use the app and save their work!
+### Vercel Analytics
+- Enable Vercel Analytics in project settings
+- Monitor usage and performance
 
----
+### Redis Monitoring
+- Check Redis Cloud dashboard for connection stats
+- Monitor memory usage and performance
 
-## ⚡ Alternative: Netlify (Drag & Drop)
+### Error Monitoring
+- Check Vercel function logs for errors
+- Monitor browser console for client-side issues
 
-### Option A: Simple Upload
-1. Run `npm run build` in your terminal
-2. Go to [netlify.com](https://netlify.com)
-3. Drag the `dist` folder to Netlify's deploy area
-4. Get instant live URL!
+## Troubleshooting
 
-### Option B: GitHub Integration
-1. Push code to GitHub (same as Vercel Step 1)
-2. On Netlify, click "New site from Git"
-3. Connect your GitHub repo
-4. Build settings: Command=`npm run build`, Directory=`dist`
-5. Deploy!
+### Common Deployment Issues
 
----
+**Build Failures:**
+```bash
+# Test locally first
+npm install
+npm run build
+```
 
-## 📱 Features Your Team Gets
+**Redis Connection Issues:**
+- Verify Redis URL format: `redis://username:password@host:port`
+- Check Redis instance is running and accessible
+- Verify environment variable is set correctly in Vercel
 
-✅ **Auto-save**: Work is automatically saved in browser  
-✅ **Export/Import**: Share data via JSON files  
-✅ **Multiple Views**: Kanban and Matrix views  
-✅ **Multiple Maps**: Create different market maps  
-✅ **Real-time**: All changes saved instantly  
+**API Timeouts:**
+- Check Vercel function logs
+- Verify Redis connection isn't timing out
+- Consider increasing function timeout limits
 
-## 🔧 Troubleshooting
+**Real-time Sync Not Working:**
+- Server-Sent Events may be blocked by some networks
+- App falls back to polling automatically
+- Check browser console for connection errors
 
-**Q: Data not saving?**  
-A: Check if browser allows localStorage (disable private/incognito mode)
+### Performance Optimization
 
-**Q: Want to share data between team members?**  
-A: Use Export/Import buttons in the app header
+**Redis Optimization:**
+- Use Redis connection pooling for high traffic
+- Consider Redis Cluster for scalability
+- Monitor memory usage and set appropriate limits
 
-**Q: Need to backup data?**  
-A: Click "Export Data" regularly to download backup files
+**Vercel Optimization:**
+- Enable Edge Functions if needed
+- Use Vercel Analytics to identify bottlenecks
+- Consider upgrading Vercel plan for higher limits
 
----
+## Security Considerations
 
-## 🎯 Ready to Deploy?
+### Rate Limiting
+The app includes basic rate limiting (100 requests/minute per IP). For production:
+- Consider implementing more sophisticated rate limiting
+- Use Vercel's Edge Middleware for additional protection
+- Monitor for abuse patterns
 
-Choose your method:
-- **Vercel**: Best for auto-updates from GitHub
-- **Netlify**: Great for one-time uploads or GitHub integration
+### Data Validation
+- All input is validated and sanitized
+- String lengths are limited to prevent abuse
+- Consider adding authentication for sensitive data
 
-Both are free and will give you a shareable URL in minutes! 
+### CORS Configuration
+- Currently allows all origins (`*`)
+- Consider restricting to specific domains in production
+
+## Scaling Considerations
+
+### High Traffic
+- Redis Cloud scales automatically
+- Vercel functions scale automatically
+- Monitor usage and upgrade plans as needed
+
+### Data Growth
+- Monitor Redis memory usage
+- Implement data archival if needed
+- Consider data compression for large datasets
+
+## Backup and Recovery
+
+### Redis Backups
+- Redis Cloud provides automatic backups
+- Export data regularly using the app's export feature
+- Store backup files in secure location
+
+### Code Backups
+- Keep GitHub repository updated
+- Tag releases for easy rollback
+- Document configuration changes
+
+## Support
+
+For issues:
+1. Check Vercel function logs
+2. Check Redis Cloud monitoring
+3. Review browser console errors
+4. Test with minimal data set
+5. Contact support if needed
+
+Your Market Map Creator should now be fully deployed with persistent Redis storage and real-time collaboration features! 

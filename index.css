@@ -34,6 +34,77 @@ body {
   height: 100vh;
 }
 
+/* Loading and Error States */
+.loading-container, .error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top: 4px solid var(--color-effecting);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-container h2 {
+  color: #dc3545;
+  margin: 0;
+}
+
+.error-container p {
+  color: var(--subtle-text-color);
+  margin: 0;
+}
+
+.error-container button {
+  padding: 0.5rem 1rem;
+  background-color: var(--color-effecting);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.error-container button:hover {
+  opacity: 0.9;
+}
+
+/* Sync Status Indicator */
+.sync-status {
+  display: flex;
+  align-items: center;
+}
+
+.sync-indicator {
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.sync-indicator.saving {
+  color: #ffc107;
+  background-color: #fff3cd;
+}
+
+.sync-indicator.synced {
+  color: #28a745;
+  background-color: #d4edda;
+}
+
 .app-container {
   display: flex;
   flex-direction: column;
@@ -285,6 +356,11 @@ body {
   gap: 0.25rem;
 }
 
+.tab-container {
+  position: relative;
+  display: inline-block;
+}
+
 .tab-btn {
   padding: 0.75rem 1.25rem;
   border: none;
@@ -295,6 +371,10 @@ body {
   color: var(--subtle-text-color);
   border-bottom: 2px solid transparent;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
 }
 
 .tab-btn:hover {
@@ -309,6 +389,64 @@ body {
 
 .add-map-btn {
   color: var(--color-effecting);
+}
+
+.tab-options-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 3px;
+  opacity: 0.6;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.tab-options-btn:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.tab-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 140px;
+  overflow: hidden;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-color);
+  transition: background-color 0.2s ease;
+  text-align: left;
+}
+
+.dropdown-item:hover {
+  background-color: var(--bg-color);
+}
+
+.dropdown-item.delete {
+  color: #dc3545;
+}
+
+.dropdown-item.delete:hover {
+  background-color: #fff5f5;
 }
 
 .card-actions {
@@ -427,6 +565,183 @@ body {
   font-size: 1.5rem;
   cursor: pointer;
   color: var(--subtle-text-color);
+}
+
+/* Delete Confirmation Modal */
+.delete-confirmation-modal {
+  text-align: center;
+  max-width: 400px;
+}
+
+.warning-icon, .danger-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.delete-confirmation-modal h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.deletion-details {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 1rem 0;
+  text-align: left;
+}
+
+.deletion-details p {
+  margin: 0 0 0.5rem 0;
+}
+
+.deletion-details ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.deletion-details li {
+  margin: 0.25rem 0;
+}
+
+.warning-text {
+  font-weight: 600;
+  color: #856404;
+  margin-top: 1rem !important;
+}
+
+.confirmation-name {
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin: 1rem 0;
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--color-effecting);
+}
+
+.btn.btn-danger {
+  background-color: #dc3545;
+  color: white;
+  border: 1px solid #dc3545;
+}
+
+.btn.btn-danger:hover:not(.disabled) {
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+
+.btn.btn-danger.disabled {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Excel Import Modal */
+.excel-import-modal {
+  max-width: 800px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.excel-import-modal h3 {
+  margin: 0 0 1rem 0;
+  color: var(--text-color);
+}
+
+.import-summary {
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.summary-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selected-count {
+  font-weight: 500;
+  color: var(--color-effecting);
+}
+
+.import-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.import-item {
+  border-bottom: 1px solid var(--border-color);
+  padding: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.import-item:last-child {
+  border-bottom: none;
+}
+
+.import-item.selected {
+  background-color: #e6f2ff;
+}
+
+.import-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.import-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.import-checkbox input[type="checkbox"] {
+  margin: 0;
+}
+
+.firm-description {
+  color: var(--subtle-text-color);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.edit-form {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: var(--bg-color);
+  border-radius: 6px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-row:last-child {
+  margin-bottom: 0;
+}
+
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
 }
 
 .modal-form h3 {
@@ -577,4 +892,14 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.matrix-pill .firm-name {
+    font-weight: 600;
+}
+
+.matrix-pill .product-name {
+    font-weight: 400;
+    opacity: 0.85;
+    font-size: 0.75rem;
 }
