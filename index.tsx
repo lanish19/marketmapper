@@ -7,6 +7,69 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as XLSX from 'xlsx';
 
+// Color system for dynamic category colors
+const COLOR_PALETTE = [
+    { main: '#007BFF', bg: '#e6f2ff' }, // Blue (Effecting)
+    { main: '#17A2B8', bg: '#e8f6f8' }, // Teal (Sensing)  
+    { main: '#6f42c1', bg: '#f1ecf9' }, // Purple (Deciding)
+    { main: '#28a745', bg: '#d4edda' }, // Green
+    { main: '#dc3545', bg: '#f8d7da' }, // Red
+    { main: '#fd7e14', bg: '#fde2e4' }, // Orange
+    { main: '#e83e8c', bg: '#f8d7da' }, // Pink
+    { main: '#6610f2', bg: '#e2d9f3' }, // Indigo
+    { main: '#20c997', bg: '#d1ecf1' }, // Teal Green
+    { main: '#ffc107', bg: '#fff3cd' }, // Yellow
+    { main: '#795548', bg: '#e8f5e8' }, // Brown
+    { main: '#607d8b', bg: '#eceff1' }, // Blue Grey
+    { main: '#f44336', bg: '#ffebee' }, // Deep Red
+    { main: '#9c27b0', bg: '#f3e5f5' }, // Deep Purple
+    { main: '#3f51b5', bg: '#e8eaf6' }, // Deep Blue
+    { main: '#009688', bg: '#e0f2f1' }, // Teal Dark
+    { main: '#ff9800', bg: '#fff3e0' }, // Deep Orange
+    { main: '#4caf50', bg: '#e8f5e8' }, // Light Green
+    { main: '#ff5722', bg: '#fbe9e7' }, // Red Orange
+    { main: '#9e9e9e', bg: '#f5f5f5' }  // Grey
+];
+
+// Get color for a category based on its index in the categories array
+const getCategoryColor = (category: string, categories: string[]) => {
+    const index = categories.indexOf(category);
+    if (index === -1) return COLOR_PALETTE[0]; // Default to first color
+    return COLOR_PALETTE[index % COLOR_PALETTE.length];
+};
+
+// Generate CSS class name for a category
+const getCategoryColorClass = (category: string, categories: string[]) => {
+    const index = categories.indexOf(category);
+    return `category-${index % COLOR_PALETTE.length}`;
+};
+
+// Dynamic CSS injection component
+const DynamicCategoryStyles: React.FC<{ categories: string[] }> = ({ categories }) => {
+    const styles = React.useMemo(() => {
+        let css = '';
+        categories.forEach((category, index) => {
+            const colorIndex = index % COLOR_PALETTE.length;
+            const color = COLOR_PALETTE[colorIndex];
+            
+            css += `
+                .card-color-bar.category-${colorIndex}, 
+                .card-pill.category-${colorIndex}, 
+                .matrix-pill.category-${colorIndex} { 
+                    background-color: ${color.bg}; 
+                    color: ${color.main}; 
+                }
+                .card-color-bar.category-${colorIndex} { 
+                    background-color: ${color.main}; 
+                }
+            `;
+        });
+        return css;
+    }, [categories]);
+
+    return <style>{styles}</style>;
+};
+
 // Type definitions
 interface Firm {
     id: string;
@@ -600,19 +663,20 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
 
 interface CardProps {
     firm: Firm;
+    categories: string[];
     onEdit: (firm: Firm) => void;
     onDelete: (firmId: string) => void;
     onViewNotes: (firm: Firm) => void;
 }
 
-const Card: React.FC<CardProps> = React.memo(({ firm, onEdit, onDelete, onViewNotes }) => {
+const Card: React.FC<CardProps> = React.memo(({ firm, categories, onEdit, onDelete, onViewNotes }) => {
     const handleEdit = React.useCallback(() => onEdit(firm), [onEdit, firm]);
     const handleDelete = React.useCallback(() => onDelete(firm.id), [onDelete, firm.id]);
     const handleViewNotes = React.useCallback(() => onViewNotes(firm), [onViewNotes, firm]);
 
     return (
         <div className="card" role="listitem" onClick={handleViewNotes} style={{ cursor: 'pointer' }}>
-            <div className={`card-color-bar ${firm.category}`}></div>
+            <div className={`card-color-bar ${getCategoryColorClass(firm.category, categories)}`}></div>
             <div className="card-actions">
                 <button onClick={(e) => { e.stopPropagation(); handleEdit(); }} className="card-action-btn" aria-label={`Edit ${firm.name}`}><EditIcon /></button>
                 <button onClick={(e) => { e.stopPropagation(); handleDelete(); }} className="card-action-btn" aria-label={`Delete ${firm.name}`}><DeleteIcon /></button>
@@ -634,7 +698,7 @@ const Card: React.FC<CardProps> = React.memo(({ firm, onEdit, onDelete, onViewNo
             </h3>
             <div className="card-field">
                 <div className="card-field-label">Subcategory</div>
-                <div className={`card-pill ${firm.category}`}>{firm.subcategory}</div>
+                <div className={`card-pill ${getCategoryColorClass(firm.category, categories)}`}>{firm.subcategory}</div>
             </div>
             {firm.product && (
                 <div className="card-field">
@@ -1178,7 +1242,7 @@ const MatrixView: React.FC<MatrixViewProps> = React.memo(({ categories, firms, o
                                         {(matrixData[cat]?.[subcat] || []).map(firm => (
                                             <div 
                                                 key={firm.id} 
-                                                className={`matrix-pill ${firm.category}`}
+                                                className={`matrix-pill ${getCategoryColorClass(firm.category, categories)}`}
                                                 onClick={() => onViewNotes(firm)}
                                                 style={{ cursor: 'pointer' }}
                                                 title="Click to view/edit notes"
@@ -1345,7 +1409,7 @@ const App = () => {
         }
         setMarketMaps(prev => ({
             ...prev,
-            [newMapId]: { id: newMapId, name: newMapName, categories: ['New Bucket'], firms: [] }
+            [newMapId]: { id: newMapId, name: newMapName, categories: ['Category 1'], firms: [] }
         }));
         setActiveMapId(newMapId);
         setView('map');
@@ -1623,6 +1687,7 @@ const App = () => {
 
     return (
         <>
+            <DynamicCategoryStyles categories={activeMap.categories} />
             <PageTabs 
                 maps={marketMaps} 
                 activeMapId={activeMapId} 
@@ -1676,7 +1741,7 @@ const App = () => {
                                         </div>
                                         <div className="card-list" role="list">
                                             {filteredFirms.length > 0 ? (
-                                                filteredFirms.map(firm => <Card key={firm.id} firm={firm} onEdit={handleEditFirm} onDelete={handleDeleteFirm} onViewNotes={handleViewNotes} />)
+                                                filteredFirms.map(firm => <Card key={firm.id} firm={firm} categories={activeMap.categories} onEdit={handleEditFirm} onDelete={handleDeleteFirm} onViewNotes={handleViewNotes} />)
                                             ) : (
                                                 <div className="no-records">No records</div>
                                             )}
