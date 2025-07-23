@@ -227,7 +227,7 @@ const parseExcelFile = async (file: File): Promise<ExcelImportData | null> => {
                 // Parse the data - Monday.com template columns: A=Name, I=Description, J=Industry, M=Location
                 const firms: ImportedFirm[] = [];
                 
-                for (let i = 1; i < jsonData.length; i++) { // Skip header row
+                for (let i = 5; i < jsonData.length; i++) { // Skip first 5 rows (template headers)
                     const row = jsonData[i] as any[];
                     const name = row[0]?.toString()?.trim(); // Column A
                     const description = row[8]?.toString()?.trim() || ''; // Column I (index 8)
