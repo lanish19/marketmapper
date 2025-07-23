@@ -1559,8 +1559,22 @@ const App = () => {
     const handleAddFirm = React.useCallback((newFirm: Omit<Firm, 'id'>) => {
         setMarketMaps(prev => {
             const map = prev[activeMapId];
+            
+            // Check if the category exists, if not add it to the categories array
+            const updatedCategories = map.categories.includes(newFirm.category) 
+                ? map.categories 
+                : [...map.categories, newFirm.category];
+            
             const updatedFirms = [...map.firms, { ...newFirm, id: String(Date.now()) }];
-            return { ...prev, [activeMapId]: { ...map, firms: updatedFirms }};
+            
+            return { 
+                ...prev, 
+                [activeMapId]: { 
+                    ...map, 
+                    categories: updatedCategories,
+                    firms: updatedFirms 
+                }
+            };
         });
     }, [activeMapId]);
 
@@ -1593,8 +1607,22 @@ const App = () => {
     const handleSaveFirm = React.useCallback((firmData: Firm) => {
         setMarketMaps(prev => {
             const map = prev[activeMapId];
+            
+            // Check if the category exists, if not add it to the categories array
+            const updatedCategories = map.categories.includes(firmData.category) 
+                ? map.categories 
+                : [...map.categories, firmData.category];
+            
             const updatedFirms = map.firms.map(f => f.id === firmData.id ? firmData : f);
-            return { ...prev, [activeMapId]: { ...map, firms: updatedFirms } };
+            
+            return { 
+                ...prev, 
+                [activeMapId]: { 
+                    ...map, 
+                    categories: updatedCategories,
+                    firms: updatedFirms 
+                } 
+            };
         });
         closeModal();
     }, [activeMapId, closeModal]);
@@ -1841,8 +1869,26 @@ const App = () => {
 
         setMarketMaps(prev => {
             const map = prev[activeMapId];
+            
+            // Collect all unique categories from the new firms
+            const newCategories = [...new Set(newFirms.map(firm => firm.category))];
+            
+            // Add any new categories that don't already exist
+            const updatedCategories = [
+                ...map.categories,
+                ...newCategories.filter(category => !map.categories.includes(category))
+            ];
+            
             const updatedFirms = [...map.firms, ...newFirms];
-            return { ...prev, [activeMapId]: { ...map, firms: updatedFirms }};
+            
+            return { 
+                ...prev, 
+                [activeMapId]: { 
+                    ...map, 
+                    categories: updatedCategories,
+                    firms: updatedFirms 
+                }
+            };
         });
 
         closeModal();
