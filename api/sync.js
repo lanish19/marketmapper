@@ -1,33 +1,45 @@
-import { createClient } from 'redis';
+const { createClient } = require('redis');
 
 // Redis clients for pub/sub
-const publisher = createClient({ 
-  url: process.env.REDIS_URL
-});
+let publisher = null;
+let subscriber = null;
 
-const subscriber = createClient({ 
-  url: process.env.REDIS_URL
-});
-
-publisher.on('error', (err) => console.error('Redis Publisher Error', err));
-subscriber.on('error', (err) => console.error('Redis Subscriber Error', err));
+function getRedisClients() {
+  if (!process.env.REDIS_URL) {
+    throw new Error('REDIS_URL environment variable is not set');
+  }
+  
+  if (!publisher) {
+    publisher = createClient({ url: process.env.REDIS_URL });
+    publisher.on('error', (err) => console.error('Redis Publisher Error', err));
+  }
+  
+  if (!subscriber) {
+    subscriber = createClient({ url: process.env.REDIS_URL });
+    subscriber.on('error', (err) => console.error('Redis Subscriber Error', err));
+  }
+  
+  return { publisher, subscriber };
+}
 
 // Store active WebSocket connections
 const activeConnections = new Set();
 
 // Initialize Redis connections
 async function initializeRedis() {
+  const { publisher, subscriber } = getRedisClients();
   if (!publisher.isOpen) {
     await publisher.connect();
   }
   if (!subscriber.isOpen) {
     await subscriber.connect();
   }
+  return { publisher, subscriber };
 }
 
 // Subscribe to market map updates
 async function subscribeToUpdates() {
-  await initializeRedis();
+  const { subscriber } = await initializeRedis();
   
   await subscriber.subscribe('market_maps_updated', (message) => {
     // Broadcast to all connected WebSocket clients
@@ -47,7 +59,7 @@ async function subscribeToUpdates() {
 subscribeToUpdates().catch(console.error);
 
 // WebSocket handler for Vercel
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     // For development/testing - return connection info
     res.status(200).json({ 
@@ -78,6 +90,12 @@ export default async function handler(req, res) {
     const connectionId = Date.now();
     
     // Set up Redis subscription for this connection
+    if (!process.env.REDIS_URL) {
+      res.writeHead(500, headers);
+      res.end('data: {"error":"Redis not configured"}\n\n');
+      return;
+    }
+    
     const connectionSubscriber = createClient({ 
       url: process.env.REDIS_URL
     });

@@ -1,11 +1,20 @@
-import { createClient } from 'redis';
+const { createClient } = require('redis');
 
 // Initialize Redis client
-const redis = createClient({ 
-  url: process.env.REDIS_URL
-});
+let redis = null;
 
-redis.on('error', (err) => console.error('Redis Client Error', err));
+function getRedisClient() {
+  if (!redis) {
+    if (!process.env.REDIS_URL) {
+      throw new Error('REDIS_URL environment variable is not set');
+    }
+    redis = createClient({ 
+      url: process.env.REDIS_URL
+    });
+    redis.on('error', (err) => console.error('Redis Client Error', err));
+  }
+  return redis;
+}
 
 const MARKET_MAPS_KEY = 'market_maps';
 
@@ -80,6 +89,7 @@ const initialMarketMapData = {
 // Get all market maps from Redis
 async function getMarketMaps() {
   try {
+    const redis = getRedisClient();
     if (!redis.isOpen) {
       await redis.connect();
     }
@@ -100,6 +110,7 @@ async function getMarketMaps() {
 // Set all market maps in Redis
 async function setMarketMaps(marketMaps) {
   try {
+    const redis = getRedisClient();
     if (!redis.isOpen) {
       await redis.connect();
     }
@@ -113,7 +124,7 @@ async function setMarketMaps(marketMaps) {
 }
 
 // Handle HTTP requests
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Get client IP for rate limiting
   const clientId = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
   
