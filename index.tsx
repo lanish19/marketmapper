@@ -15,6 +15,9 @@ interface Firm {
     subcategory: string;
     product?: string;
     notes?: string;
+    description?: string;
+    industry?: string;
+    location?: string;
 }
 
 interface MarketMap {
@@ -32,6 +35,8 @@ interface ImportedFirm {
     id: string;
     name: string;
     description: string;
+    industry: string;
+    location: string;
     // Fields to be filled by user
     category: string;
     subcategory: string;
@@ -142,19 +147,23 @@ const parseExcelFile = async (file: File): Promise<ExcelImportData | null> => {
                 // Convert to JSON
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                 
-                // Parse the data - expecting columns: A=Name, B=Description
+                // Parse the data - Monday.com template columns: A=Name, I=Description, J=Industry, M=Location
                 const firms: ImportedFirm[] = [];
                 
                 for (let i = 1; i < jsonData.length; i++) { // Skip header row
                     const row = jsonData[i] as any[];
-                    const name = row[0]?.toString()?.trim();
-                    const description = row[1]?.toString()?.trim() || '';
+                    const name = row[0]?.toString()?.trim(); // Column A
+                    const description = row[8]?.toString()?.trim() || ''; // Column I (index 8)
+                    const industry = row[9]?.toString()?.trim() || ''; // Column J (index 9)
+                    const location = row[12]?.toString()?.trim() || ''; // Column M (index 12)
                     
                     if (name) {
                         firms.push({
                             id: `import_${Date.now()}_${i}`,
                             name,
                             description,
+                            industry,
+                            location,
                             category: '',
                             subcategory: '',
                             product: '',
@@ -445,8 +454,12 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                                 </button>
                             </div>
                             
-                            {firm.description && (
-                                <div className="firm-description">{firm.description}</div>
+                            {(firm.description || firm.industry || firm.location) && (
+                                <div className="firm-description">
+                                    {firm.description && <div><strong>Description:</strong> {firm.description}</div>}
+                                    {firm.industry && <div><strong>Industry:</strong> {firm.industry}</div>}
+                                    {firm.location && <div><strong>Location:</strong> {firm.location}</div>}
+                                </div>
                             )}
 
                             {editingFirm === firm.id && (
@@ -527,6 +540,40 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                                             </select>
                                         </div>
                                     </div>
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label>Description</label>
+                                            <textarea
+                                                className="form-control"
+                                                value={firm.description}
+                                                onChange={(e) => handleEditFirm(firm.id, { description: e.target.value })}
+                                                rows={3}
+                                                placeholder="Firm description..."
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label>Industry #</label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                value={firm.industry}
+                                                onChange={(e) => handleEditFirm(firm.id, { industry: e.target.value })}
+                                                placeholder="e.g., defense, COMM, uxv"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Location</label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                value={firm.location}
+                                                onChange={(e) => handleEditFirm(firm.id, { location: e.target.value })}
+                                                placeholder="e.g., Palm Beach Gardens, FL, USA"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -575,6 +622,15 @@ const Card: React.FC<CardProps> = React.memo(({ firm, onEdit, onDelete, onViewNo
                 {firm.notes && firm.notes.trim() && (
                     <span className="notes-indicator" title="Has notes">📝</span>
                 )}
+                {firm.description && firm.description.trim() && (
+                    <span className="notes-indicator" title="Has description">📄</span>
+                )}
+                {firm.industry && firm.industry.trim() && (
+                    <span className="notes-indicator" title="Has industry">🏭</span>
+                )}
+                {firm.location && firm.location.trim() && (
+                    <span className="notes-indicator" title="Has location">📍</span>
+                )}
             </h3>
             <div className="card-field">
                 <div className="card-field-label">Subcategory</div>
@@ -621,6 +677,21 @@ const FirmNotesModal: React.FC<FirmNotesModalProps> = ({ firm, onUpdateNotes, on
                             <span className="label">Product:</span> {firm.product}
                         </div>
                     )}
+                    {firm.description && (
+                        <div className="firm-detail">
+                            <span className="label">Description:</span> {firm.description}
+                        </div>
+                    )}
+                    {firm.industry && (
+                        <div className="firm-detail">
+                            <span className="label">Industry #:</span> {firm.industry}
+                        </div>
+                    )}
+                    {firm.location && (
+                        <div className="firm-detail">
+                            <span className="label">Location:</span> {firm.location}
+                        </div>
+                    )}
                 </div>
                 <div className="form-group">
                     <label htmlFor="modalNotes">Notes</label>
@@ -662,6 +733,9 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
     const [product, setProduct] = React.useState('');
     const [category, setCategory] = React.useState('');
     const [notes, setNotes] = React.useState('');
+    const [description, setDescription] = React.useState('');
+    const [industry, setIndustry] = React.useState('');
+    const [location, setLocation] = React.useState('');
     const [isTypingNewSubcategory, setIsTypingNewSubcategory] = React.useState(false);
 
     const uniqueSubcategories = React.useMemo(() => {
@@ -675,6 +749,9 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
         setProduct(firm.product || '');
         setCategory(firm.category);
         setNotes(firm.notes || '');
+        setDescription(firm.description || '');
+        setIndustry(firm.industry || '');
+        setLocation(firm.location || '');
         setIsTypingNewSubcategory(!uniqueSubcategories.includes(firm.subcategory));
     }, [firm, uniqueSubcategories]);
 
@@ -695,7 +772,7 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
             alert('Please fill in Firm Name, Subcategory, and select a Category.');
             return;
         }
-        onSave({ ...firm, name, subcategory, product, category, notes });
+        onSave({ ...firm, name, subcategory, product, category, notes, description, industry, location });
     };
 
     return (
@@ -749,6 +826,39 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
                 </select>
             </div>
             <div className="form-group">
+                <label htmlFor="description">Description (Optional)</label>
+                <textarea 
+                    id="description" 
+                    className="form-control" 
+                    value={description} 
+                    onChange={e => setDescription(e.target.value)}
+                    placeholder="Describe the firm and its capabilities..."
+                    rows={3}
+                />
+            </div>
+            <div className="form-group">
+                <label htmlFor="industry">Industry # (Optional)</label>
+                <input 
+                    id="industry" 
+                    type="text" 
+                    className="form-control" 
+                    value={industry} 
+                    onChange={e => setIndustry(e.target.value)}
+                    placeholder="e.g., defense, COMM, uxv"
+                />
+            </div>
+            <div className="form-group">
+                <label htmlFor="location">Location (Optional)</label>
+                <input 
+                    id="location" 
+                    type="text" 
+                    className="form-control" 
+                    value={location} 
+                    onChange={e => setLocation(e.target.value)}
+                    placeholder="e.g., Palm Beach Gardens, FL, USA"
+                />
+            </div>
+            <div className="form-group">
                 <label htmlFor="notes">Notes (Optional)</label>
                 <textarea 
                     id="notes" 
@@ -780,6 +890,9 @@ const AddFirmForm: React.FC<AddFirmFormProps> = ({ categories, firms, onAddFirm 
     const [isTypingNewSubcategory, setIsTypingNewSubcategory] = React.useState(false);
     const [product, setProduct] = React.useState('');
     const [category, setCategory] = React.useState(categories[0] || '');
+    const [description, setDescription] = React.useState('');
+    const [industry, setIndustry] = React.useState('');
+    const [location, setLocation] = React.useState('');
 
     const uniqueSubcategories = React.useMemo(() => {
         const subcats = new Set(firms.map(f => f.subcategory));
@@ -809,10 +922,13 @@ const AddFirmForm: React.FC<AddFirmFormProps> = ({ categories, firms, onAddFirm 
             alert('Please fill in Firm Name, Subcategory and select a category.');
             return;
         }
-        onAddFirm({ name, subcategory, product, category });
+        onAddFirm({ name, subcategory, product, category, description, industry, location });
         setName('');
         setSubcategory('');
         setProduct('');
+        setDescription('');
+        setIndustry('');
+        setLocation('');
         setIsTypingNewSubcategory(false);
 
     };
@@ -1071,6 +1187,15 @@ const MatrixView: React.FC<MatrixViewProps> = React.memo(({ categories, firms, o
                                                     {firm.name}
                                                     {firm.notes && firm.notes.trim() && (
                                                         <span className="notes-indicator" title="Has notes"> 📝</span>
+                                                    )}
+                                                    {firm.description && firm.description.trim() && (
+                                                        <span className="notes-indicator" title="Has description"> 📄</span>
+                                                    )}
+                                                    {firm.industry && firm.industry.trim() && (
+                                                        <span className="notes-indicator" title="Has industry"> 🏭</span>
+                                                    )}
+                                                    {firm.location && firm.location.trim() && (
+                                                        <span className="notes-indicator" title="Has location"> 📍</span>
                                                     )}
                                                 </span>
                                                 {firm.product && (
@@ -1355,7 +1480,7 @@ const App = () => {
         if (!activeMapData) return;
 
         // CSV headers
-        const headers = ['Firm Name', 'Category', 'Subcategory', 'Product', 'Description'];
+        const headers = ['Firm Name', 'Category', 'Subcategory', 'Product', 'Description', 'Industry #', 'Location', 'Notes'];
         
         // Convert firms to CSV rows
         const rows = activeMapData.firms.map(firm => [
@@ -1363,7 +1488,10 @@ const App = () => {
             firm.category,
             firm.subcategory,
             firm.product || '',
-            '' // Description field (empty for now, can be added if needed)
+            firm.description || '',
+            firm.industry || '',
+            firm.location || '',
+            firm.notes || ''
         ]);
 
         // Combine headers and rows
@@ -1439,7 +1567,10 @@ const App = () => {
             name: importedFirm.name,
             category: importedFirm.category,
             subcategory: importedFirm.subcategory,
-            product: importedFirm.product || undefined
+            product: importedFirm.product || undefined,
+            description: importedFirm.description || undefined,
+            industry: importedFirm.industry || undefined,
+            location: importedFirm.location || undefined
         }));
 
         setMarketMaps(prev => {
