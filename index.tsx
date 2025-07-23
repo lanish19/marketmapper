@@ -796,18 +796,6 @@ const Card: React.FC<CardProps> = React.memo(({ firm, categories, onEdit, onDele
             </div>
             <h3 className="card-title">
                 {firm.name}
-                {firm.notes && firm.notes.trim() && (
-                    <span className="notes-indicator" title="Has notes">📝</span>
-                )}
-                {firm.description && firm.description.trim() && (
-                    <span className="notes-indicator" title="Has description">📄</span>
-                )}
-                {firm.industry && firm.industry.trim() && (
-                    <span className="notes-indicator" title="Has industry">🏭</span>
-                )}
-                {firm.location && firm.location.trim() && (
-                    <span className="notes-indicator" title="Has location">📍</span>
-                )}
             </h3>
             <div className="card-field">
                 <div className="card-field-label">Subcategory</div>
@@ -1426,21 +1414,9 @@ const MatrixView: React.FC<MatrixViewProps> = React.memo(({ categories, firms, o
                                                 style={{ cursor: 'pointer' }}
                                                 title="Click to view/edit notes"
                                             >
-                                                <span className="firm-name">
-                                                    {firm.name}
-                                                    {firm.notes && firm.notes.trim() && (
-                                                        <span className="notes-indicator" title="Has notes"> 📝</span>
-                                                    )}
-                                                    {firm.description && firm.description.trim() && (
-                                                        <span className="notes-indicator" title="Has description"> 📄</span>
-                                                    )}
-                                                    {firm.industry && firm.industry.trim() && (
-                                                        <span className="notes-indicator" title="Has industry"> 🏭</span>
-                                                    )}
-                                                    {firm.location && firm.location.trim() && (
-                                                        <span className="notes-indicator" title="Has location"> 📍</span>
-                                                    )}
-                                                </span>
+                                                                                <span className="firm-name">
+                                    {firm.name}
+                                </span>
                                                 {firm.product && (
                                                     <span className="product-name"> ({firm.product})</span>
                                                 )}
