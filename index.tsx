@@ -14,6 +14,7 @@ interface Firm {
     category: string;
     subcategory: string;
     product?: string;
+    notes?: string;
 }
 
 interface MarketMap {
@@ -554,20 +555,27 @@ interface CardProps {
     firm: Firm;
     onEdit: (firm: Firm) => void;
     onDelete: (firmId: string) => void;
+    onViewNotes: (firm: Firm) => void;
 }
 
-const Card: React.FC<CardProps> = React.memo(({ firm, onEdit, onDelete }) => {
+const Card: React.FC<CardProps> = React.memo(({ firm, onEdit, onDelete, onViewNotes }) => {
     const handleEdit = React.useCallback(() => onEdit(firm), [onEdit, firm]);
     const handleDelete = React.useCallback(() => onDelete(firm.id), [onDelete, firm.id]);
+    const handleViewNotes = React.useCallback(() => onViewNotes(firm), [onViewNotes, firm]);
 
     return (
-        <div className="card" role="listitem">
+        <div className="card" role="listitem" onClick={handleViewNotes} style={{ cursor: 'pointer' }}>
             <div className={`card-color-bar ${firm.category}`}></div>
             <div className="card-actions">
-                <button onClick={handleEdit} className="card-action-btn" aria-label={`Edit ${firm.name}`}><EditIcon /></button>
-                <button onClick={handleDelete} className="card-action-btn" aria-label={`Delete ${firm.name}`}><DeleteIcon /></button>
+                <button onClick={(e) => { e.stopPropagation(); handleEdit(); }} className="card-action-btn" aria-label={`Edit ${firm.name}`}><EditIcon /></button>
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(); }} className="card-action-btn" aria-label={`Delete ${firm.name}`}><DeleteIcon /></button>
             </div>
-            <h3 className="card-title">{firm.name}</h3>
+            <h3 className="card-title">
+                {firm.name}
+                {firm.notes && firm.notes.trim() && (
+                    <span className="notes-indicator" title="Has notes">📝</span>
+                )}
+            </h3>
             <div className="card-field">
                 <div className="card-field-label">Subcategory</div>
                 <div className={`card-pill ${firm.category}`}>{firm.subcategory}</div>
@@ -581,6 +589,62 @@ const Card: React.FC<CardProps> = React.memo(({ firm, onEdit, onDelete }) => {
         </div>
     );
 });
+
+interface FirmNotesModalProps {
+    firm: Firm;
+    onUpdateNotes: (firmId: string, notes: string) => void;
+    onClose: () => void;
+}
+
+const FirmNotesModal: React.FC<FirmNotesModalProps> = ({ firm, onUpdateNotes, onClose }) => {
+    const [notes, setNotes] = React.useState(firm.notes || '');
+
+    const handleSave = () => {
+        onUpdateNotes(firm.id, notes);
+        onClose();
+    };
+
+    return (
+        <Modal onClose={onClose}>
+            <div className="notes-modal">
+                <h3>Notes: {firm.name}</h3>
+                <div className="firm-details">
+                    <div className="firm-detail">
+                        <span className="label">Category:</span> {firm.category}
+                    </div>
+                    <div className="firm-detail">
+                        <span className="label">Subcategory:</span> {firm.subcategory}
+                    </div>
+                    {firm.product && (
+                        <div className="firm-detail">
+                            <span className="label">Product:</span> {firm.product}
+                        </div>
+                    )}
+                </div>
+                <div className="form-group">
+                    <label htmlFor="modalNotes">Notes</label>
+                    <textarea
+                        id="modalNotes"
+                        className="form-control notes-textarea"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Add your notes about this firm..."
+                        rows={8}
+                        autoFocus
+                    />
+                </div>
+                <div className="form-actions">
+                    <button type="button" className="btn btn-secondary" onClick={onClose}>
+                        Cancel
+                    </button>
+                    <button type="button" className="btn btn-primary" onClick={handleSave}>
+                        Save Notes
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
 
 interface FirmFormProps {
     firm: Firm;
@@ -596,6 +660,7 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
     const [subcategory, setSubcategory] = React.useState('');
     const [product, setProduct] = React.useState('');
     const [category, setCategory] = React.useState('');
+    const [notes, setNotes] = React.useState('');
     const [isTypingNewSubcategory, setIsTypingNewSubcategory] = React.useState(false);
 
     const uniqueSubcategories = React.useMemo(() => {
@@ -608,6 +673,7 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
         setSubcategory(firm.subcategory);
         setProduct(firm.product || '');
         setCategory(firm.category);
+        setNotes(firm.notes || '');
         setIsTypingNewSubcategory(!uniqueSubcategories.includes(firm.subcategory));
     }, [firm, uniqueSubcategories]);
 
@@ -628,7 +694,7 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
             alert('Please fill in Firm Name, Subcategory, and select a Category.');
             return;
         }
-        onSave({ ...firm, name, subcategory, product, category });
+        onSave({ ...firm, name, subcategory, product, category, notes });
     };
 
     return (
@@ -680,6 +746,17 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
                     <option value="" disabled>Select a category</option>
                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
+            </div>
+            <div className="form-group">
+                <label htmlFor="notes">Notes (Optional)</label>
+                <textarea 
+                    id="notes" 
+                    className="form-control notes-textarea" 
+                    value={notes} 
+                    onChange={e => setNotes(e.target.value)}
+                    placeholder="Add your notes about this firm..."
+                    rows={4}
+                />
             </div>
             <div className="form-actions">
                 <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
@@ -938,9 +1015,10 @@ const AddMapPage: React.FC<AddMapPageProps> = ({ onCancel, onCreateMap }) => {
 interface MatrixViewProps {
     categories: string[];
     firms: Firm[];
+    onViewNotes: (firm: Firm) => void;
 }
 
-const MatrixView: React.FC<MatrixViewProps> = React.memo(({ categories, firms }) => {
+const MatrixView: React.FC<MatrixViewProps> = React.memo(({ categories, firms, onViewNotes }) => {
     const subcategories = React.useMemo(() => {
         const subcats = new Set(firms.map(f => f.subcategory));
         return Array.from(subcats).sort();
@@ -981,8 +1059,19 @@ const MatrixView: React.FC<MatrixViewProps> = React.memo(({ categories, firms })
                                 <td key={cat}>
                                     <div className="cell-content">
                                         {(matrixData[cat]?.[subcat] || []).map(firm => (
-                                            <div key={firm.id} className={`matrix-pill ${firm.category}`}>
-                                                <span className="firm-name">{firm.name}</span>
+                                            <div 
+                                                key={firm.id} 
+                                                className={`matrix-pill ${firm.category}`}
+                                                onClick={() => onViewNotes(firm)}
+                                                style={{ cursor: 'pointer' }}
+                                                title="Click to view/edit notes"
+                                            >
+                                                <span className="firm-name">
+                                                    {firm.name}
+                                                    {firm.notes && firm.notes.trim() && (
+                                                        <span className="notes-indicator" title="Has notes"> 📝</span>
+                                                    )}
+                                                </span>
                                                 {firm.product && (
                                                     <span className="product-name"> ({firm.product})</span>
                                                 )}
@@ -1006,7 +1095,7 @@ const App = () => {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
     const [saving, setSaving] = React.useState(false);
-    const [modal, setModal] = React.useState<{ isOpen: boolean; type: 'edit-firm' | 'delete-map' | 'excel-import' | null; data: Firm | null; mapId?: string; importData?: ExcelImportData }>({ isOpen: false, type: null, data: null });
+    const [modal, setModal] = React.useState<{ isOpen: boolean; type: 'edit-firm' | 'delete-map' | 'excel-import' | 'firm-notes' | null; data: Firm | null; mapId?: string; importData?: ExcelImportData }>({ isOpen: false, type: null, data: null });
     const [view, setView] = React.useState<'map' | 'add-map'>('map');
     const [currentView, setCurrentView] = React.useState<'kanban' | 'matrix'>('kanban');
 
@@ -1086,6 +1175,18 @@ const App = () => {
     const handleEditFirm = React.useCallback((firmToEdit: Firm) => {
         setModal({ isOpen: true, type: 'edit-firm', data: firmToEdit });
     }, []);
+
+    const handleViewNotes = React.useCallback((firm: Firm) => {
+        setModal({ isOpen: true, type: 'firm-notes', data: firm });
+    }, []);
+
+    const handleUpdateNotes = React.useCallback((firmId: string, notes: string) => {
+        setMarketMaps(prev => {
+            const map = prev[activeMapId];
+            const updatedFirms = map.firms.map(f => f.id === firmId ? { ...f, notes } : f);
+            return { ...prev, [activeMapId]: { ...map, firms: updatedFirms } };
+        });
+    }, [activeMapId]);
 
     const handleDeleteFirm = React.useCallback((firmId: string) => {
         if (window.confirm('Are you sure you want to delete this firm?')) {
@@ -1443,7 +1544,7 @@ const App = () => {
                                         </div>
                                         <div className="card-list" role="list">
                                             {filteredFirms.length > 0 ? (
-                                                filteredFirms.map(firm => <Card key={firm.id} firm={firm} onEdit={handleEditFirm} onDelete={handleDeleteFirm} />)
+                                                filteredFirms.map(firm => <Card key={firm.id} firm={firm} onEdit={handleEditFirm} onDelete={handleDeleteFirm} onViewNotes={handleViewNotes} />)
                                             ) : (
                                                 <div className="no-records">No records</div>
                                             )}
@@ -1456,7 +1557,7 @@ const App = () => {
                             </div>
                         </div>
                     ) : (
-                       <MatrixView categories={activeMap.categories} firms={activeMap.firms} />
+                       <MatrixView categories={activeMap.categories} firms={activeMap.firms} onViewNotes={handleViewNotes} />
                     )}
                 </main>
             </div>
@@ -1489,6 +1590,13 @@ const App = () => {
                     allFirms={activeMap.firms}
                     onImport={handleExcelImport}
                     onCancel={closeModal}
+                />
+            )}
+            {modal.isOpen && modal.type === 'firm-notes' && modal.data && (
+                <FirmNotesModal
+                    firm={modal.data}
+                    onUpdateNotes={handleUpdateNotes}
+                    onClose={closeModal}
                 />
             )}
         </>
