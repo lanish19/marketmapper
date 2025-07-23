@@ -522,6 +522,7 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
     const [firms, setFirms] = React.useState<ImportedFirm[]>(importData.firms);
     const [editingFirm, setEditingFirm] = React.useState<string | null>(null);
     const [typingNewSubcategory, setTypingNewSubcategory] = React.useState<{[key: string]: boolean}>({});
+    const [typingNewCategory, setTypingNewCategory] = React.useState<{[key: string]: boolean}>({});
 
     const uniqueSubcategories = React.useMemo(() => {
         const subcats = new Set(allFirms.map(f => f.subcategory));
@@ -675,17 +676,44 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                                         </div>
                                         <div className="form-group">
                                             <label>Category *</label>
-                                            <select
-                                                className="form-control"
-                                                value={firm.category}
-                                                onChange={(e) => handleEditFirm(firm.id, { category: e.target.value })}
-                                                required
-                                            >
-                                                <option value="">Select a category</option>
-                                                {categories.map(cat => (
-                                                    <option key={cat} value={cat}>{cat}</option>
-                                                ))}
-                                            </select>
+                                            {typingNewCategory[firm.id] ? (
+                                                <input
+                                                    type="text"
+                                                    className="form-control"
+                                                    value={firm.category}
+                                                    onChange={(e) => handleEditFirm(firm.id, { category: e.target.value })}
+                                                    onBlur={() => {
+                                                        if (!firm.category.trim()) {
+                                                            setTypingNewCategory(prev => ({ ...prev, [firm.id]: false }));
+                                                            handleEditFirm(firm.id, { category: '' });
+                                                        }
+                                                    }}
+                                                    placeholder="Enter new category"
+                                                    autoFocus
+                                                />
+                                            ) : (
+                                                <select
+                                                    className="form-control"
+                                                    value={firm.category}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        if (value === '_new_') {
+                                                            setTypingNewCategory(prev => ({ ...prev, [firm.id]: true }));
+                                                            handleEditFirm(firm.id, { category: '' });
+                                                        } else {
+                                                            setTypingNewCategory(prev => ({ ...prev, [firm.id]: false }));
+                                                            handleEditFirm(firm.id, { category: value });
+                                                        }
+                                                    }}
+                                                    required
+                                                >
+                                                    <option value="">Select or create new</option>
+                                                    <option value="_new_">Type new category</option>
+                                                    {categories.map(cat => (
+                                                        <option key={cat} value={cat}>{cat}</option>
+                                                    ))}
+                                                </select>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="form-row">
@@ -886,6 +914,7 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
     const [industry, setIndustry] = React.useState('');
     const [location, setLocation] = React.useState('');
     const [isTypingNewSubcategory, setIsTypingNewSubcategory] = React.useState(false);
+    const [isTypingNewCategory, setIsTypingNewCategory] = React.useState(false);
 
     const uniqueSubcategories = React.useMemo(() => {
         const subcats = new Set(allFirms.map(f => f.subcategory));
@@ -902,7 +931,8 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
         setIndustry(firm.industry || '');
         setLocation(firm.location || '');
         setIsTypingNewSubcategory(!uniqueSubcategories.includes(firm.subcategory));
-    }, [firm, uniqueSubcategories]);
+        setIsTypingNewCategory(!categories.includes(firm.category));
+    }, [firm, uniqueSubcategories, categories]);
 
     const handleSubcategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.target.value;
@@ -912,6 +942,17 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
         } else if (value !== '') {
             setIsTypingNewSubcategory(false);
             setSubcategory(value);
+        }
+    };
+
+    const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value;
+        if (value === '_new_') {
+            setIsTypingNewCategory(true);
+            setCategory('');
+        } else if (value !== '') {
+            setIsTypingNewCategory(false);
+            setCategory(value);
         }
     };
 
@@ -969,10 +1010,30 @@ const FirmForm: React.FC<FirmFormProps> = ({ firm, categories, allFirms, onSave,
             </div>
             <div className="form-group">
                 <label htmlFor="category">Category</label>
-                <select id="category" className="form-control" value={category} onChange={e => setCategory(e.target.value)} required>
-                    <option value="" disabled>Select a category</option>
-                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
+                {isTypingNewCategory ? (
+                    <input
+                        id="category"
+                        type="text"
+                        className="form-control"
+                        value={category}
+                        onChange={e => setCategory(e.target.value)}
+                        onBlur={() => {
+                            // If user clicks away from an empty input, revert to original state
+                            if (!category.trim()) {
+                                setCategory(firm.category);
+                                setIsTypingNewCategory(!categories.includes(firm.category));
+                            }
+                        }}
+                        required
+                        autoFocus
+                    />
+                ) : (
+                    <select id="category" className="form-control" value={category} onChange={handleCategoryChange} required>
+                        <option value="" disabled>Select or create new</option>
+                        <option value="_new_">Insert/Type new category</option>
+                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                )}
             </div>
             <div className="form-group">
                 <label htmlFor="description">Description (Optional)</label>
@@ -1042,6 +1103,7 @@ const AddFirmForm: React.FC<AddFirmFormProps> = ({ categories, firms, onAddFirm 
     const [description, setDescription] = React.useState('');
     const [industry, setIndustry] = React.useState('');
     const [location, setLocation] = React.useState('');
+    const [isTypingNewCategory, setIsTypingNewCategory] = React.useState(false);
 
     const uniqueSubcategories = React.useMemo(() => {
         const subcats = new Set(firms.map(f => f.subcategory));
@@ -1065,6 +1127,17 @@ const AddFirmForm: React.FC<AddFirmFormProps> = ({ categories, firms, onAddFirm 
         }
     };
 
+    const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value;
+        if (value === '_new_') {
+            setIsTypingNewCategory(true);
+            setCategory('');
+        } else if (value !== '') {
+            setIsTypingNewCategory(false);
+            setCategory(value);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim() || !subcategory.trim() || !category) {
@@ -1079,6 +1152,7 @@ const AddFirmForm: React.FC<AddFirmFormProps> = ({ categories, firms, onAddFirm 
         setIndustry('');
         setLocation('');
         setIsTypingNewSubcategory(false);
+        setIsTypingNewCategory(false);
 
     };
 
@@ -1128,9 +1202,29 @@ const AddFirmForm: React.FC<AddFirmFormProps> = ({ categories, firms, onAddFirm 
                 </div>
                 <div className="form-group category-group">
                     <label htmlFor="add-category">Category</label>
-                    <select id="add-category" className="form-control" value={category} onChange={e => setCategory(e.target.value)} required>
-                         {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
+                    {isTypingNewCategory ? (
+                        <input
+                            id="add-category"
+                            type="text"
+                            className="form-control"
+                            value={category}
+                            onChange={e => setCategory(e.target.value)}
+                            onBlur={() => {
+                                if (!category.trim()) {
+                                    setIsTypingNewCategory(false);
+                                    setCategory(categories[0] || '');
+                                }
+                            }}
+                            required
+                            autoFocus
+                        />
+                    ) : (
+                        <select id="add-category" className="form-control" value={category} onChange={handleCategoryChange} required>
+                            <option value="" disabled>Select or create new</option>
+                            <option value="_new_">Insert/Type new category</option>
+                            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                    )}
                 </div>
                 <div className="button-group">
                     <button type="submit" className="btn btn-primary">Add Firm</button>
