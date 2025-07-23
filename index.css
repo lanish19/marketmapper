@@ -553,7 +553,10 @@ body {
   border-radius: 8px;
   width: 90%;
   max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
   position: relative;
+  box-sizing: border-box;
 }
 
 .modal-close {
@@ -761,12 +764,16 @@ body {
 
 .notes-textarea {
   min-height: 100px;
+  max-height: 300px;
   resize: vertical;
   font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.notes-modal {
-  max-width: 600px;
+/* Notes modal specific styling */
+.notes-modal-content {
+  max-width: 600px !important;
   width: 90vw;
 }
 
@@ -796,6 +803,44 @@ body {
 .firm-detail .label {
   font-weight: 600;
   color: var(--subtle-text-color);
+}
+
+.notes-modal .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.notes-modal .form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.notes-modal .form-control {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+.notes-modal .form-control:focus {
+  outline: none;
+  border-color: var(--color-deciding);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.notes-modal .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
 }
 
 .edit-form {

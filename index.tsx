@@ -605,8 +605,9 @@ const FirmNotesModal: React.FC<FirmNotesModalProps> = ({ firm, onUpdateNotes, on
     };
 
     return (
-        <Modal onClose={onClose}>
-            <div className="notes-modal">
+        <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+            <div className="modal-content notes-modal-content" onClick={e => e.stopPropagation()}>
+                <button className="modal-close" onClick={onClose} aria-label="Close modal">&times;</button>
                 <h3>Notes: {firm.name}</h3>
                 <div className="firm-details">
                     <div className="firm-detail">
@@ -642,7 +643,7 @@ const FirmNotesModal: React.FC<FirmNotesModalProps> = ({ firm, onUpdateNotes, on
                     </button>
                 </div>
             </div>
-        </Modal>
+        </div>
     );
 };
 
