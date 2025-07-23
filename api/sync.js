@@ -1,21 +1,25 @@
-const { createClient } = require('redis');
-
-// Redis clients for pub/sub
+// Lazy load Redis to avoid build-time issues
 let publisher = null;
 let subscriber = null;
+let redisModule = null;
 
-function getRedisClients() {
+async function getRedisClients() {
   if (!process.env.REDIS_URL) {
     throw new Error('REDIS_URL environment variable is not set');
   }
   
+  if (!redisModule) {
+    // Dynamically import Redis only when needed
+    redisModule = require('redis');
+  }
+  
   if (!publisher) {
-    publisher = createClient({ url: process.env.REDIS_URL });
+    publisher = redisModule.createClient({ url: process.env.REDIS_URL });
     publisher.on('error', (err) => console.error('Redis Publisher Error', err));
   }
   
   if (!subscriber) {
-    subscriber = createClient({ url: process.env.REDIS_URL });
+    subscriber = redisModule.createClient({ url: process.env.REDIS_URL });
     subscriber.on('error', (err) => console.error('Redis Subscriber Error', err));
   }
   
@@ -27,7 +31,7 @@ const activeConnections = new Set();
 
 // Initialize Redis connections
 async function initializeRedis() {
-  const { publisher, subscriber } = getRedisClients();
+  const { publisher, subscriber } = await getRedisClients();
   if (!publisher.isOpen) {
     await publisher.connect();
   }
@@ -96,7 +100,8 @@ module.exports = async function handler(req, res) {
       return;
     }
     
-    const connectionSubscriber = createClient({ 
+    const redis = require('redis');
+    const connectionSubscriber = redis.createClient({ 
       url: process.env.REDIS_URL
     });
     

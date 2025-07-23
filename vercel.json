@@ -1,5 +1,8 @@
 {
   "functions": {
+    "api/test.js": {
+      "maxDuration": 10
+    },
     "api/data.js": {
       "maxDuration": 30
     },
@@ -7,8 +10,10 @@
       "maxDuration": 300
     }
   },
-  "env": {
-    "REDIS_URL": "@redis_url"
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
   },
   "headers": [
     {

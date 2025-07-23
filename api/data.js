@@ -1,14 +1,19 @@
-const { createClient } = require('redis');
-
-// Initialize Redis client
+// Lazy load Redis to avoid build-time issues
 let redis = null;
+let redisModule = null;
 
-function getRedisClient() {
+async function getRedisClient() {
+  if (!process.env.REDIS_URL) {
+    throw new Error('REDIS_URL environment variable is not set');
+  }
+  
+  if (!redisModule) {
+    // Dynamically import Redis only when needed
+    redisModule = require('redis');
+  }
+  
   if (!redis) {
-    if (!process.env.REDIS_URL) {
-      throw new Error('REDIS_URL environment variable is not set');
-    }
-    redis = createClient({ 
+    redis = redisModule.createClient({ 
       url: process.env.REDIS_URL
     });
     redis.on('error', (err) => console.error('Redis Client Error', err));
@@ -89,7 +94,7 @@ const initialMarketMapData = {
 // Get all market maps from Redis
 async function getMarketMaps() {
   try {
-    const redis = getRedisClient();
+    const redis = await getRedisClient();
     if (!redis.isOpen) {
       await redis.connect();
     }
@@ -110,7 +115,7 @@ async function getMarketMaps() {
 // Set all market maps in Redis
 async function setMarketMaps(marketMaps) {
   try {
-    const redis = getRedisClient();
+    const redis = await getRedisClient();
     if (!redis.isOpen) {
       await redis.connect();
     }
