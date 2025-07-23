@@ -721,6 +721,37 @@ body {
   padding-left: 1.5rem;
 }
 
+.import-item .form-row {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.import-item .form-group {
+  flex: 1;
+}
+
+.import-item .form-group label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.import-item .form-control {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.import-item .form-control:focus {
+  outline: none;
+  border-color: var(--color-deciding);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
 .edit-form {
   margin-top: 1rem;
   padding: 1rem;

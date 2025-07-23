@@ -363,6 +363,7 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
 }) => {
     const [firms, setFirms] = React.useState<ImportedFirm[]>(importData.firms);
     const [editingFirm, setEditingFirm] = React.useState<string | null>(null);
+    const [typingNewSubcategory, setTypingNewSubcategory] = React.useState<{[key: string]: boolean}>({});
 
     const uniqueSubcategories = React.useMemo(() => {
         const subcats = new Set(allFirms.map(f => f.subcategory));
@@ -472,27 +473,43 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                                     <div className="form-row">
                                         <div className="form-group">
                                             <label>Subcategory</label>
-                                            <select
-                                                className="form-control"
-                                                value={firm.subcategory}
-                                                onChange={(e) => {
-                                                    const value = e.target.value;
-                                                    if (value === '_new_') {
-                                                        const newSubcategory = prompt('Enter new subcategory:');
-                                                        if (newSubcategory) {
-                                                            handleEditFirm(firm.id, { subcategory: newSubcategory });
+                                            {typingNewSubcategory[firm.id] ? (
+                                                <input
+                                                    type="text"
+                                                    className="form-control"
+                                                    value={firm.subcategory}
+                                                    onChange={(e) => handleEditFirm(firm.id, { subcategory: e.target.value })}
+                                                    onBlur={() => {
+                                                        if (!firm.subcategory.trim()) {
+                                                            setTypingNewSubcategory(prev => ({ ...prev, [firm.id]: false }));
+                                                            handleEditFirm(firm.id, { subcategory: '' });
                                                         }
-                                                    } else {
-                                                        handleEditFirm(firm.id, { subcategory: value });
-                                                    }
-                                                }}
-                                            >
-                                                <option value="">Select or create new</option>
-                                                <option value="_new_">Type new subcategory</option>
-                                                {uniqueSubcategories.map(sc => (
-                                                    <option key={sc} value={sc}>{sc}</option>
-                                                ))}
-                                            </select>
+                                                    }}
+                                                    placeholder="Enter new subcategory"
+                                                    autoFocus
+                                                />
+                                            ) : (
+                                                <select
+                                                    className="form-control"
+                                                    value={firm.subcategory}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        if (value === '_new_') {
+                                                            setTypingNewSubcategory(prev => ({ ...prev, [firm.id]: true }));
+                                                            handleEditFirm(firm.id, { subcategory: '' });
+                                                        } else {
+                                                            setTypingNewSubcategory(prev => ({ ...prev, [firm.id]: false }));
+                                                            handleEditFirm(firm.id, { subcategory: value });
+                                                        }
+                                                    }}
+                                                >
+                                                    <option value="">Select or create new</option>
+                                                    <option value="_new_">Type new subcategory</option>
+                                                    {uniqueSubcategories.map(sc => (
+                                                        <option key={sc} value={sc}>{sc}</option>
+                                                    ))}
+                                                </select>
+                                            )}
                                         </div>
                                         <div className="form-group">
                                             <label>Category *</label>
